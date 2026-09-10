@@ -1,10 +1,18 @@
 "use client";
 
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import api from "../../../../api";
 import jsPDF from "jspdf";
 import { Workbook } from "exceljs";
+import {
+  requestStatementExport,
+  uploadStatementDocument,
+  fetchStatementExports,
+  statementFromPayload,
+  saveBlob,
+  openStoredDocument,
+} from "../services/statementExportService";
 import "../css/SubcontractorStatementDetail.css";
 
 const SubcontractorStatementDetail = () => {
@@ -12,14 +20,21 @@ const SubcontractorStatementDetail = () => {
   const location = useLocation();
   console.log("Received state:", location.state);
   const {
-    statementId,
+    statementKey,
+    period,
     subcontractorName,
     subcontractorId,
     subei_reg_num,
-    legids,
-    date,
     vatStatus,
   } = location.state || {};
+
+  // The derived key doubles as the statement number shown on screen and printed
+  // on documents, replacing the retired sub_state_id serial.
+  const statementId = statementKey;
+
+  // Midday avoids any timezone rolling the month backwards when the date is
+  // formatted for display or a filename.
+  const date = period ? `${period}-01T12:00:00` : null;
 
   const [statement, setStatement] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -28,11 +43,38 @@ const SubcontractorStatementDetail = () => {
   const [companyInfo, setCompanyInfo] = useState(null);
   const [subcontractorInfo, setSubcontractorInfo] = useState(null);
 
+  // Export snapshots: every document produced from this statement, frozen at
+  // the moment it was produced.
+  const [exportHistory, setExportHistory] = useState([]);
+  const [exportMessage, setExportMessage] = useState("");
+  const [exportError, setExportError] = useState(false);
+
   const statementRef = useRef(null);
 
+  // The month the legs were driven — carried straight through from the list.
+  const exportPeriod = period;
+
+  const refreshExports = useCallback(async () => {
+    if (!subei_reg_num || !exportPeriod) return;
+    try {
+      const rows = await fetchStatementExports({
+        subeiRegNum: subei_reg_num,
+        period: exportPeriod,
+        vatStatus: vatStatus,
+      });
+      setExportHistory(rows);
+    } catch (err) {
+      console.error("Error fetching export history:", err);
+    }
+  }, [subei_reg_num, exportPeriod, vatStatus]);
+
   useEffect(() => {
-    if (!statementId || !legids) {
-      setError("No statement or leg data selected");
+    refreshExports();
+  }, [refreshExports]);
+
+  useEffect(() => {
+    if (!statementKey || !subei_reg_num) {
+      setError("No statement selected");
       setLoading(false);
       return;
     }
@@ -40,26 +82,11 @@ const SubcontractorStatementDetail = () => {
     const fetchStatementDetail = async () => {
       try {
         setLoading(true);
-        let legKeys;
-        try {
-          const parsedLegids = JSON.parse(legids);
-          legKeys = parsedLegids.map((item) => item.legkey);
-          console.log("Parsed legKeys:", legKeys);
-        } catch (e) {
-          console.error("Invalid legids JSON:", e, "Received:", legids);
-          legKeys = [];
-        }
 
-        if (legKeys.length === 0) {
-          throw new Error("No valid leg keys found in legids");
-        }
-
+        // The server resolves the statement's legs from the key; the page no
+        // longer round-trips a leg list it would have to keep in step.
         const response = await api.get("/subcontractor/statement-details", {
-          params: {
-            statementId,
-            legKeys: legKeys.join(","),
-            subei_reg_num,
-          },
+          params: { statementKey, subei_reg_num },
         });
         console.log("Statement details response:", response.data);
 
@@ -109,7 +136,6 @@ const SubcontractorStatementDetail = () => {
           statementId,
           subcontractorName,
           subcontractorId,
-          // generationDate is expected to already be adjusted (DB date minus 1 day)
           generationDate: date,
           workItems,
           summary: {
@@ -126,13 +152,14 @@ const SubcontractorStatementDetail = () => {
     };
 
     fetchStatementDetail();
-  }, [statementId, subcontractorId, subcontractorName, subei_reg_num, legids]);
+  }, [statementKey, statementId, date, subcontractorId, subcontractorName, subei_reg_num]);
 
-  const generatePDF = () => {
-    if (isGenerating || !statement || !companyInfo || !subcontractorInfo)
-      return;
-    setIsGenerating(true);
-
+  // `statement` is a PARAMETER here, deliberately shadowing the component state
+  // of the same name: a document must render from the server's frozen snapshot
+  // payload, never from whatever the page happens to be displaying. Returns the
+  // rendered file instead of saving it, so the caller can both hand it to the
+  // user and upload it against the snapshot.
+  const buildPdf = (statement) => {
     const doc = new jsPDF({
       orientation: "portrait",
       unit: "mm",
@@ -600,17 +627,16 @@ const SubcontractorStatementDetail = () => {
       doc.text(`Page ${i} of ${pageCount}`, 210 - margin, 287, { align: 'right' });
     }
 
-    // Save PDF with descriptive filename
     const dateStr = new Date(statement.generationDate).toLocaleDateString('en-GB');
-    doc.save(`Subcontractor-Statement-${statementId}-${subcontractorName}-${dateStr}.pdf`);
-    setIsGenerating(false);
+    return {
+      blob: doc.output("blob"),
+      filename: `Subcontractor-Statement-${statementId}-${subcontractorName}-${dateStr}.pdf`,
+    };
   };
 
-  const generateExcel = async () => {
-    if (isGenerating || !statement || !companyInfo || !subcontractorInfo)
-      return;
-    setIsGenerating(true);
-
+  // Same shadowing rule as buildPdf: renders from the snapshot payload, returns
+  // the file rather than saving it.
+  const buildExcel = async (statement) => {
     try {
       const workbook = new Workbook();
       const worksheet = workbook.addWorksheet("Statement");
@@ -697,23 +723,95 @@ const SubcontractorStatementDetail = () => {
       worksheet.getCell(`B${currentRow}`).numFmt = '"R"#,##0.00';
       worksheet.getCell(`B${currentRow}`).font = { bold: true };
 
-      // Generate file
       const dateBG = new Date(statement.generationDate).toLocaleDateString("en-GB");
       const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `Subcontractor-Statement-${statementId}-${subcontractorName}-${dateBG}.xlsx`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      return {
+        blob: new Blob([buffer], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+        filename: `Subcontractor-Statement-${statementId}-${subcontractorName}-${dateBG}.xlsx`,
+      };
     } catch (err) {
-      console.error("Error generating Excel:", err);
-      alert("Failed to generate Excel file. Please try again.");
+      console.error("Error building Excel workbook:", err);
+      // Surfaced by handleExport, which reports it and re-enables the buttons.
+      throw err;
+    }
+  };
+
+  /**
+   * Print/export is what makes a statement real, so it is the moment we freeze
+   * it. The server re-derives the figures, stores that snapshot, and returns the
+   * payload; the document is rendered from that payload and the resulting file
+   * is uploaded back against the same snapshot.
+   *
+   * Re-exporting content that has not changed hands back the document already on
+   * file rather than producing a second one, so a reprint is byte-for-byte what
+   * the subcontractor received the first time.
+   */
+  const handleExport = async (format) => {
+    if (isGenerating || !statement || !companyInfo || !subcontractorInfo) return;
+
+    if (!exportPeriod) {
+      setExportError(true);
+      setExportMessage("Cannot determine the statement period for this export.");
+      return;
+    }
+
+    setIsGenerating(true);
+    setExportError(false);
+    setExportMessage("");
+
+    try {
+      const result = await requestStatementExport({
+        subeiRegNum: subei_reg_num,
+        period: exportPeriod,
+        vatStatus,
+        format,
+      });
+
+      if (!result.document_pending && result.export?.document_url) {
+        openStoredDocument(result.export.document_url);
+        setExportMessage(
+          `Statement unchanged — re-issued the ${format} already on file (snapshot ${result.export.export_id}).`
+        );
+        await refreshExports();
+        return;
+      }
+
+      const snapshot = statementFromPayload(result.payload, {
+        statementId,
+        subcontractorName,
+        subcontractorId,
+        generationDate: date,
+      });
+
+      const { blob, filename } =
+        format === "PDF" ? buildPdf(snapshot) : await buildExcel(snapshot);
+
+      saveBlob(blob, filename);
+
+      // The snapshot exists either way; a failed upload leaves it without a
+      // stored document rather than losing the record of the export.
+      try {
+        await uploadStatementDocument(result.export.export_id, blob, filename);
+        setExportMessage(
+          `${format} exported and archived as snapshot ${result.export.export_id}.`
+        );
+      } catch (uploadErr) {
+        console.error("Error archiving statement document:", uploadErr);
+        setExportError(true);
+        setExportMessage(
+          `${format} downloaded, but archiving the copy failed. The export is recorded; the stored document is missing.`
+        );
+      }
+
+      await refreshExports();
+    } catch (err) {
+      console.error("Error exporting statement:", err);
+      setExportError(true);
+      setExportMessage(
+        err.response?.data?.message || `Failed to export ${format}.`
+      );
     } finally {
       setIsGenerating(false);
     }
@@ -893,18 +991,104 @@ const SubcontractorStatementDetail = () => {
           </button>
           <button
             className={`download-btn ${isGenerating ? "generating" : ""}`}
-            onClick={generatePDF}
+            onClick={() => handleExport("PDF")}
             disabled={isGenerating}
           >
             {isGenerating ? "Generating PDF..." : "Download PDF"}
           </button>
           <button
             className={`download-btn ${isGenerating ? "generating" : ""}`}
-            onClick={generateExcel}
+            onClick={() => handleExport("XLSX")}
             disabled={isGenerating}
           >
             {isGenerating ? "Generating Excel..." : "Download Excel"}
           </button>
+        </div>
+
+        {exportMessage && (
+          <div
+            className={`export-message ${exportError ? "error" : "success"}`}
+            role="status"
+          >
+            {exportMessage}
+          </div>
+        )}
+
+        {/* Export history — what was actually handed to this subcontractor, and
+            when. Amounts here are frozen and do not move when a leg is later
+            corrected. */}
+        <div className="export-history">
+          <h3>Export history</h3>
+          {exportHistory.length === 0 ? (
+            <p className="export-history-empty">
+              This statement has not been exported yet. Downloading a PDF or
+              Excel copy archives exactly what was sent.
+            </p>
+          ) : (
+            <table className="export-history-table">
+              <thead>
+                <tr>
+                  <th>Exported</th>
+                  <th>By</th>
+                  <th>Format</th>
+                  <th>Legs</th>
+                  <th>Amount</th>
+                  <th>Document</th>
+                </tr>
+              </thead>
+              <tbody>
+                {exportHistory.map((row) => {
+                  const drifted =
+                    statement &&
+                    Math.abs(
+                      Number(row.amount) - Number(statement.summary.finalAmount)
+                    ) > 0.005;
+
+                  return (
+                    <tr key={row.export_id}>
+                      <td>
+                        {new Date(row.exported_at).toLocaleString("en-GB", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })}
+                      </td>
+                      <td>{row.exported_by_name || "—"}</td>
+                      <td>{row.document_format || "—"}</td>
+                      <td>{row.leg_count}</td>
+                      <td>
+                        R
+                        {Number(row.amount).toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                        {drifted && (
+                          <span
+                            className="export-drift"
+                            title="This is what was sent. The statement has changed since."
+                          >
+                            {" "}
+                            (differs from current)
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        {row.document_url ? (
+                          <button
+                            className="view-btn"
+                            onClick={() => openStoredDocument(row.document_url)}
+                          >
+                            Open
+                          </button>
+                        ) : (
+                          <span className="export-missing">Not archived</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>

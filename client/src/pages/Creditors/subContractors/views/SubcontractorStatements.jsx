@@ -6,6 +6,21 @@ import api from "../../../../api";
 import "../css/SubcontractorStatements.css";
 import Pagination from "../../../../components/Pagination";
 
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
 const SubcontractorStatements = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -15,8 +30,6 @@ const SubcontractorStatements = () => {
   const [statements, setStatements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [generating, setGenerating] = useState(false);
-  const [generationMessage, setGenerationMessage] = useState("");
 
   // Set default filters to previous month (with year wrap, same as client statements)
   const currentDate = new Date();
@@ -58,24 +71,19 @@ const SubcontractorStatements = () => {
       if (!response.data) throw new Error("Failed to fetch statements");
 
       const transformedStatements = response.data.map((item) => {
-        const originalDate = new Date(item.date);
-        const adjustedDate = new Date(originalDate);
-        adjustedDate.setDate(adjustedDate.getDate() - 1);
+        // item.date is the month the legs were driven, as YYYY-MM-DD. Split the
+        // string rather than building a Date: "YYYY-MM-DD" parses as UTC
+        // midnight, which renders as the previous month anywhere west of UTC.
+        const [year, month] = item.date.split("-").map(Number);
 
         return {
-          statementId: item.sub_state_id,
-          month: adjustedDate.toLocaleString("default", {
-            month: "long",
-          }),
-          year: adjustedDate.getFullYear(),
-          generationDate: adjustedDate.toISOString(),
+          statementKey: item.statement_key,
+          period: item.date.slice(0, 7),
+          month: MONTH_NAMES[month - 1],
+          year,
           totalAmount: item.amount,
+          legCount: item.leg_count,
           vatStatus: item.vat_status || "VAT",
-          status: "Pending", // Assuming status needs to be derived; adjust as needed
-          legids:
-            typeof item.legids === "object"
-              ? JSON.stringify(item.legids)
-              : item.legids,
         };
       });
 
@@ -100,74 +108,6 @@ const SubcontractorStatements = () => {
     }));
     setCurrentPage(1);
   };
-
-  const handleManualGeneration = async () => {
-    if (!subei_reg_num) {
-      setGenerationMessage("No subcontractor registration number available");
-      return;
-    }
-
-    setGenerating(true);
-    setGenerationMessage("");
-
-    try {
-      const response = await api.post("/subcontractor/generate-statement", {
-        subei_reg_num: subei_reg_num,
-        specificSubcontractor: true,
-      });
-
-      if (response.data.success) {
-        const created = Number(response.data?.stats?.created || 0);
-        const updated = Number(response.data?.stats?.updated || 0);
-        let msg = response.data.message;
-        if (!msg) {
-          if (created > 0) msg = "Statement created for this subcontractor.";
-          else if (updated > 0) msg = "Statement updated for this subcontractor.";
-          else msg = "No statement was created or updated for this subcontractor.";
-        }
-        setGenerationMessage(msg);
-        // Refresh the statements list
-        await fetchStatements();
-      } else {
-        throw new Error(
-          response.data.message || "Failed to generate statement"
-        );
-      }
-    } catch (err) {
-      console.error("Error generating statement:", err);
-
-      let errorMessage = "Failed to generate statement";
-
-      if (err.response) {
-        const { status, data } = err.response;
-        errorMessage = data?.message || `HTTP error! Status: ${status}`;
-      } else if (err.request) {
-        errorMessage =
-          "No response received from server. Please check your connection.";
-      } else {
-        errorMessage = err.message;
-      }
-
-      setGenerationMessage(errorMessage);
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const monthNames = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-  ];
 
   const minYear = 2025;
   const maxYear = currentDate.getFullYear() + 2;
@@ -234,67 +174,15 @@ const SubcontractorStatements = () => {
               onChange={handleFilterChange}
             >
               <option>Month</option>
-              {monthNames.map((month, index) => (
+              {MONTH_NAMES.map((month, index) => (
                 <option key={index} value={index + 1}>
                   {month}
                 </option>
               ))}
             </select>
           </div>
-          <button
-            onClick={handleManualGeneration}
-            disabled={generating}
-            className="back-button"
-            style={{
-              backgroundColor: "#4caf50",
-              color: "white",
-              border: "none",
-              padding: "10px 20px",
-              borderRadius: "6px",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              marginTop: "333px",
-              marginLeft: "920px",
-            }}
-          >
-            {generating ? "Generating..." : "Generate Statement"}
-          </button>
         </div>
       </div>
-
-      {generationMessage && (
-        <div
-          className={`generation-message ${
-            generationMessage.includes("Error") ||
-            generationMessage.includes("Failed")
-              ? "error"
-              : "success"
-          }`}
-          style={{
-            padding: "10px",
-            margin: "10px 0",
-            borderRadius: "4px",
-            backgroundColor:
-              generationMessage.includes("Error") ||
-              generationMessage.includes("Failed")
-                ? "#f8d7da"
-                : "#d4edda",
-            color:
-              generationMessage.includes("Error") ||
-              generationMessage.includes("Failed")
-                ? "#721c24"
-                : "#155724",
-            border: `1px solid ${
-              generationMessage.includes("Error") ||
-              generationMessage.includes("Failed")
-                ? "#f5c6cb"
-                : "#c3e6cb"
-            }`,
-          }}
-        >
-          {generationMessage}
-        </div>
-      )}
 
       <table className="statements-table">
         <thead>
@@ -313,8 +201,8 @@ const SubcontractorStatements = () => {
             </tr>
           ) : (
             currentStatements.map((statement) => (
-              <tr key={statement.statementId}>
-                <td>{statement.statementId}</td>
+              <tr key={statement.statementKey}>
+                <td>{statement.statementKey}</td>
                 <td>
                   {statement.month} {statement.year}
                 </td>
@@ -328,12 +216,11 @@ const SubcontractorStatements = () => {
                     onClick={() =>
                       navigate("/Creditors/SubcontractorStatementDetails", {
                         state: {
-                          statementId: statement.statementId,
+                          statementKey: statement.statementKey,
+                          period: statement.period,
                           subcontractorName,
                           subcontractorId,
                           subei_reg_num,
-                          legids: statement.legids,
-                          date: statement.generationDate, // Pass as-is, now ensured to be a string
                           vatStatus: statement.vatStatus,
                         },
                       })

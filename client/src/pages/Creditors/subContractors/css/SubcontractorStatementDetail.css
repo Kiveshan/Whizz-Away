@@ -574,3 +574,87 @@
     padding: 15px;
   }
 }
+
+/* --- Export snapshots ---------------------------------------------------- */
+/* Feedback from an export, and the history of documents actually produced from
+   this statement. Amounts in the history are frozen at export time, so they can
+   legitimately differ from the live figures above. */
+
+.statement-detail-wrapper .export-message {
+  margin: 16px 0;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 14px;
+}
+
+.statement-detail-wrapper .export-message.success {
+  background-color: #d4edda;
+  border-color: #c3e6cb;
+  color: #155724;
+}
+
+.statement-detail-wrapper .export-message.error {
+  background-color: #f8d7da;
+  border-color: #f5c6cb;
+  color: #721c24;
+}
+
+.statement-detail-wrapper .export-history {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.statement-detail-wrapper .export-history h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  color: #1a365d;
+}
+
+.statement-detail-wrapper .export-history-empty {
+  margin: 0;
+  color: #4a5568;
+  font-size: 14px;
+}
+
+.statement-detail-wrapper .export-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.statement-detail-wrapper .export-history-table th,
+.statement-detail-wrapper .export-history-table td {
+  padding: 10px 8px;
+  text-align: left;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.statement-detail-wrapper .export-history-table th {
+  background-color: #f8fafc;
+  color: #1a365d;
+  font-weight: 600;
+}
+
+.statement-detail-wrapper .export-drift {
+  color: #975a16;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.statement-detail-wrapper .export-missing {
+  color: #a0aec0;
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .statement-detail-wrapper .export-history-table {
+    font-size: 12px;
+  }
+
+  .statement-detail-wrapper .export-history-table th,
+  .statement-detail-wrapper .export-history-table td {
+    padding: 8px 6px;
+  }
+}
