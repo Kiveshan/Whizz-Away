@@ -254,14 +254,24 @@ function ContentWrapper() {
     location.pathname === "/client-invoice";
   const isStatementDetail = location.pathname === "/client-statement";
   const isClientSubbieReport = location.pathname === "/client-subbie-commission";
+  const isSubbieStatements =
+    location.pathname === "/Creditors/SubcontractorStatements";
+  const isSubbieStatementDetail =
+    location.pathname === "/Creditors/SubcontractorStatementDetails";
 
   const showBackInTopBar =
-    isInvoiceDetail || isStatementDetail || isClientSubbieReport;
+    isInvoiceDetail ||
+    isStatementDetail ||
+    isClientSubbieReport ||
+    isSubbieStatements ||
+    isSubbieStatementDetail;
 
   const getBackTarget = () => {
     if (isInvoiceDetail) return "/invoices";
     if (isStatementDetail) return "/statements-list";
     if (isClientSubbieReport) return "/reports";
+    if (isSubbieStatements) return "/Creditors/SubcontractorList";
+    if (isSubbieStatementDetail) return "/Creditors/SubcontractorStatements";
     return null;
   };
 

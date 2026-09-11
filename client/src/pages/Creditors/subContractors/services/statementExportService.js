@@ -13,22 +13,6 @@
 import api from "../../../../api.js";
 
 /**
- * The export period is the month the legs were driven, as YYYY-MM.
- *
- * The statements list already hands this page a `date` that has had a day
- * subtracted from the stored generation date (which is the 1st of the FOLLOWING
- * month), so it lands on the last day of the legs month. Deriving the period
- * from it therefore just means taking its year and month — in local time, since
- * the last day of a month shifts into the previous one under toISOString for
- * anywhere east of UTC.
- */
-export const periodFromStatementDate = (date) => {
-  const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}`;
-};
-
-/**
  * Freeze the statement and get back the payload to render from.
  * Resolves to { reused, document_pending, export, payload }.
  */
@@ -112,8 +96,7 @@ export const openStoredDocument = (url) => {
  * `driverrate` is VAT-inclusive and already rounded to cents by the server; the
  * total is the sum of those rounded line items, so what is printed adds up.
  */
-export const statementFromPayload = (payload, { statementId, subcontractorName, subcontractorId, generationDate }) => ({
-  statementId,
+export const statementFromPayload = (payload, { subcontractorName, subcontractorId, generationDate }) => ({
   subcontractorName,
   subcontractorId,
   generationDate,

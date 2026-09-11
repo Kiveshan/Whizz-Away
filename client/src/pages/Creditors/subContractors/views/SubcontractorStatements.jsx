@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../../../../api";
+import { formatRand } from "../services/statementFormatting.js";
 import "../css/SubcontractorStatements.css";
 import Pagination from "../../../../components/Pagination";
 
@@ -124,7 +125,7 @@ const SubcontractorStatements = () => {
   if (loading)
     return (
       <div className="subcontractor-statements-wrapper">
-        <div>Loading statements...</div>
+        <div className="status-message">Loading statements...</div>
       </div>
     );
   if (error)
@@ -136,18 +137,14 @@ const SubcontractorStatements = () => {
   if (!subcontractorId || !subei_reg_num)
     return (
       <div className="subcontractor-statements-wrapper">
-        <div>Please select a subcontractor from the previous page.</div>
+        <div className="status-message">
+          Please select a subcontractor from the previous page.
+        </div>
       </div>
     );
 
   return (
     <div className="subcontractor-statements-wrapper">
-      <button
-        onClick={() => navigate("/Creditors/SubcontractorList")}
-        className="back-button"
-      >
-        Back
-      </button>
       <div className="page-title">
         <h2>Monthly Statements - {subcontractorName}</h2>
       </div>
@@ -187,9 +184,9 @@ const SubcontractorStatements = () => {
       <table className="statements-table">
         <thead>
           <tr>
-            <th>Statement ID</th>
             <th>Month/Year</th>
             <th>Type</th>
+            <th>Legs</th>
             <th>Total Amount</th>
             <th>Actions</th>
           </tr>
@@ -197,19 +194,21 @@ const SubcontractorStatements = () => {
         <tbody>
           {currentStatements.length === 0 ? (
             <tr>
-              <td colSpan="4">No statements found for the selected period.</td>
+              <td colSpan="5">
+                No statements found for the selected period.
+              </td>
             </tr>
           ) : (
             currentStatements.map((statement) => (
               <tr key={statement.statementKey}>
-                <td>{statement.statementKey}</td>
                 <td>
                   {statement.month} {statement.year}
                 </td>
                 <td>
                   {statement.vatStatus === "NON_VAT" ? "No VAT" : "VAT"}
                 </td>
-                <td>R{statement.totalAmount.toLocaleString()}</td>
+                <td>{statement.legCount}</td>
+                <td>{formatRand(statement.totalAmount)}</td>
                 <td>
                   <button
                     className="view-btn"
