@@ -20,9 +20,19 @@
     background: #eaf2fb;
   }
 
-  .card-icon-panel svg {
-    width: 36px;
-    height: 36px;
+  .card-icon-badge {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #0f5fa8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .card-icon-badge svg {
+    width: 30px;
+    height: 30px;
   }
 
   .card-title {
@@ -31,12 +41,6 @@
     text-align: center;
   }
 
-  .logout-container {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 20px; 
-  }
   
   .card h3 {
     font-size: 15px;

@@ -139,3 +139,19 @@ export const ROLE_DASHBOARDS = {
 };
 
 export const dashboardForRole = (roleid) => ROLE_DASHBOARDS[roleid] || "/";
+
+// Display names for roleid, shown e.g. under the user's name in the header.
+// Keep in sync with server/config/roles.js.
+export const ROLE_NAMES = {
+  1: "Business Manager",
+  2: "Controller",
+  3: "Debtors Clerk",
+  4: "Director",
+  5: "Driver",
+  6: "Subcontractor",
+  7: "Admin",
+  8: "Creditors Clerk",
+  9: "Yard Staff",
+};
+
+export const roleName = (roleid) => ROLE_NAMES[roleid] || "";

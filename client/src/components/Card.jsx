@@ -44,16 +44,18 @@ const Card = ({ title, onClick }) => {
   return (
     <div className="card" onClick={onClick}>
       <div className="card-icon-panel">
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#0f5fa8"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: ICONS[title] || DEFAULT_ICON }}
-        />
+        <div className="card-icon-badge">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#fff"
+            strokeWidth="1.75"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            dangerouslySetInnerHTML={{ __html: ICONS[title] || DEFAULT_ICON }}
+          />
+        </div>
       </div>
       <div className="card-title">
         <h3>{title}</h3>

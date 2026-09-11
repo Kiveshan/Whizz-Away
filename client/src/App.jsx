@@ -11,7 +11,6 @@ import { AuthProvider } from "./context/AuthContext";
 import TokenExpiryNotification from "./components/TokenExpiryNotification";
 import Header from "./components/Header";
 import Footer from "./components/Footer"; // Import the Footer component
-import LogoutButton from "./components/LogoutButton";
 import LandingPage from "./pages/user_menus/views/LandingPage";
 import { RequireAuth, RoleGuard } from "./components/ProtectedRoute";
 
@@ -244,9 +243,9 @@ function DynamicHeader() {
 function ContentWrapper() {
   const location = useLocation();
   const hideFooterOn = ["/login", "/register", "/"]; // hide global footer on landing
-  const hideLogoutOn = ["/login", "/register", "/landing", "/new-landing", "/"]; // hide logout on landing
+  const hideBackBarOn = ["/login", "/register", "/landing", "/new-landing", "/"]; // hide top actions bar on landing
   const shouldShowFooter = !hideFooterOn.includes(location.pathname);
-  const shouldShowLogout = !hideLogoutOn.includes(location.pathname);
+  const shouldShowBackBar = !hideBackBarOn.includes(location.pathname);
 
   // Only show inline Back button for specific detail routes
   const isInvoiceDetail =
@@ -279,32 +278,21 @@ function ContentWrapper() {
 
   return (
     <div className="content-area">
-      {shouldShowLogout && (
-        showBackInTopBar ? (
-          <div className="top-actions-bar">
-            {backTarget && (
-              <button
-                className="back-button-inline"
-                onClick={() => {
-                  if (window.history.length > 1) {
-                    window.history.back();
-                  } else if (backTarget) {
-                    window.location.href = backTarget;
-                  }
-                }}
-              >
-                Back
-              </button>
-            )}
-            <div className="logout-container">
-              <LogoutButton />
-            </div>
-          </div>
-        ) : (
-          <div className="logout-container">
-            <LogoutButton />
-          </div>
-        )
+      {shouldShowBackBar && showBackInTopBar && backTarget && (
+        <div className="top-actions-bar">
+          <button
+            className="back-button-inline"
+            onClick={() => {
+              if (window.history.length > 1) {
+                window.history.back();
+              } else if (backTarget) {
+                window.location.href = backTarget;
+              }
+            }}
+          >
+            Back
+          </button>
+        </div>
       )}
       <Routes>
         {/* ---------- Public (pre-auth) routes ---------- */}
