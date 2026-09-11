@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import Card from "../../../components/Card";
 import "../css/Debtors.css";
 import "../css/card.css";
 
@@ -33,38 +34,10 @@ const DirectorDebtors = () => {
       </div>
 
       <div className="debtors-grid">
-        <div className="card" onClick={handlePaymentClick}>
-          <div className="card-image-container">
-            <img src="/images/Payment.jpg" alt="Payment" />
-          </div>
-          <div className="card-title">
-            <h3>Payment Received</h3>
-          </div>
-        </div>
-        <div className="card" onClick={handleStatementClick}>
-          <div className="card-image-container">
-            <img src="/images/Statements.jpg" alt="Statement" />
-          </div>
-          <div className="card-title">
-            <h3>Financial Documents</h3>
-          </div>
-        </div>
-        <div className="card" onClick={handleAddOnClick}>
-          <div className="card-image-container">
-            <img src="/images/Add-On's.jpg" alt="Add On" />
-          </div>
-          <div className="card-title">
-            <h3>Add On's</h3>
-          </div>
-        </div>
-        <div className="card" onClick={handleAgeAnalysisClick}>
-          <div className="card-image-container">
-            <img src="/images/Statements.jpg" alt="Age Analysis" />
-          </div>
-          <div className="card-title">
-            <h3>Age Analysis</h3>
-          </div>
-        </div>
+        <Card title="Payment Received" onClick={handlePaymentClick} />
+        <Card title="Financial Documents" onClick={handleStatementClick} />
+        <Card title="Add On's" onClick={handleAddOnClick} />
+        <Card title="Age Analysis" onClick={handleAgeAnalysisClick} />
       </div>
     </div>
   );

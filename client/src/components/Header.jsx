@@ -66,6 +66,7 @@ const Header = ({ title }) => {
           className="logo-img"
           alt="Business Logo"
         />
+        <span className="brand-name">Whizz Away</span>
       </div>
       <h1>{title}</h1>
       <div className="user-info">
