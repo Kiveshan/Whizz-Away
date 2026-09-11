@@ -845,7 +845,7 @@ const SubcontractorStatementDetail = () => {
       if (!result.document_pending && result.export?.document_url) {
         openStoredDocument(result.export.document_url);
         setExportMessage(
-          `Statement unchanged — re-issued the ${format} already on file (snapshot ${result.export.export_id}).`
+          `Statement unchanged — re-issued the ${format} already on file.`
         );
         await refreshExports();
         return;
@@ -867,7 +867,7 @@ const SubcontractorStatementDetail = () => {
       try {
         await uploadStatementDocument(result.export.export_id, blob, filename);
         setExportMessage(
-          `${format} exported and archived as snapshot ${result.export.export_id}.`
+          `${format} downloaded and saved to export history.`
         );
       } catch (uploadErr) {
         console.error("Error archiving statement document:", uploadErr);
