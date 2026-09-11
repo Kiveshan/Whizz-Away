@@ -1,0 +1,908 @@
+/*
+ * Shared look for the controller instruction screens: client list, instruction
+ * list, view instruction and create instruction. Everything is scoped under
+ * .wa-page so none of it leaks into the older instruction screens.
+ */
+
+.wa-page {
+  background: #eef5fa;
+  color: #16375f;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  min-height: 100%;
+  padding-bottom: 72px;
+}
+
+.wa-page *,
+.wa-page *::before,
+.wa-page *::after {
+  box-sizing: border-box;
+}
+
+/* ---------- Secondary bar (back link + Clients / Create tabs) ---------- */
+
+.wa-subnav {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 28px;
+  background: #fff;
+  border-bottom: 1px solid #dae4f0;
+}
+
+.wa-subnav-back {
+  background: #fff;
+  color: #1f4e88;
+  border: 1px solid #cfdcec;
+  padding: 8px 16px;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.wa-subnav-back:hover {
+  background: #f6f9fd;
+}
+
+.wa-tabs {
+  display: flex;
+  border: 1px solid #cfdcec;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.wa-tab {
+  padding: 9px 18px;
+  font-size: 13.5px;
+  font-weight: 700;
+  background: #fff;
+  color: #4a5a72;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.wa-tab + .wa-tab {
+  border-left: 1px solid #cfdcec;
+}
+
+.wa-tab:hover {
+  background: #f6f9fd;
+}
+
+.wa-tab.is-active {
+  background: #1f4e88;
+  color: #fff;
+}
+
+/* ---------- Layout ---------- */
+
+.wa-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 28px 20px 0;
+}
+
+.wa-container.is-narrow {
+  max-width: 1100px;
+}
+
+.wa-container.is-form {
+  max-width: 1200px;
+}
+
+.wa-card {
+  background: #fff;
+  border: 1px solid #dae4f0;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(22, 55, 95, 0.06);
+  padding: 28px 32px;
+}
+
+.wa-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.wa-card-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: #16375f;
+  margin: 0;
+  text-align: left;
+}
+
+.wa-muted {
+  font-size: 13px;
+  color: #5a6b81;
+}
+
+.wa-state {
+  padding: 40px 16px;
+  text-align: center;
+  color: #5a6b81;
+  font-size: 14px;
+}
+
+.wa-state.is-error {
+  color: #b91c1c;
+}
+
+/* ---------- Inputs ---------- */
+
+.wa-input,
+.wa-select {
+  padding: 8px 12px;
+  border: 1px solid #cfdcec;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #16375f;
+  background: #fff;
+  font-family: inherit;
+  height: auto;
+}
+
+.wa-input:focus,
+.wa-select:focus {
+  outline: none;
+  border-color: #1f4e88;
+  box-shadow: 0 0 0 2px rgba(31, 78, 136, 0.15);
+}
+
+.wa-input:disabled,
+.wa-select:disabled,
+.wa-input[readonly] {
+  background: #f6f9fd;
+  color: #5a6b81;
+  border-color: #e6edf6;
+  cursor: not-allowed;
+}
+
+.wa-input.has-error,
+.wa-select.has-error {
+  border-color: #d32f2f;
+  background: #fff6f6;
+}
+
+.wa-search {
+  flex: 0 1 340px;
+  min-width: 220px;
+}
+
+.wa-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0 14px;
+}
+
+/* ---------- Chips (filters, shipment type, VAT) ---------- */
+
+.wa-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.wa-chip {
+  border: 1px solid #cfdcec;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #fff;
+  color: #4a5a72;
+  font-family: inherit;
+}
+
+.wa-chip:hover {
+  border-color: #1f4e88;
+}
+
+.wa-chip.is-active {
+  background: #1f4e88;
+  border-color: #1f4e88;
+  color: #fff;
+}
+
+.wa-chip.is-outline {
+  border-color: #1f4e88;
+  color: #1f4e88;
+  padding: 8px 18px;
+  font-size: 13px;
+}
+
+.wa-chip.is-outline.is-active {
+  color: #fff;
+}
+
+.wa-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wa-chip-divider {
+  width: 1px;
+  height: 22px;
+  background: #dae4f0;
+  margin: 0 4px;
+}
+
+/* ---------- Tables ---------- */
+
+.wa-table-wrap {
+  border: 1px solid #dae4f0;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.wa-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: #fff;
+  margin: 0;
+}
+
+.wa-table th {
+  background: #1f4e88;
+  color: #fff;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border: none;
+}
+
+.wa-table td {
+  padding: 9px 12px;
+  border: none;
+  border-bottom: 1px solid #eef2f8;
+  color: #3d4d63;
+  white-space: nowrap;
+  vertical-align: middle;
+  text-align: left;
+}
+
+.wa-table tbody tr:nth-child(even) td {
+  background: #fafcfe;
+}
+
+.wa-table tbody tr:hover td {
+  background: #f3f7fc;
+}
+
+.wa-table .is-center {
+  text-align: center;
+}
+
+.wa-table .is-right {
+  text-align: right;
+}
+
+.wa-table .is-strong {
+  color: #16375f;
+  font-weight: 600;
+}
+
+.wa-table td.wa-empty {
+  padding: 24px;
+  text-align: center;
+  color: #5a6b81;
+  white-space: normal;
+}
+
+.wa-table.is-light th {
+  background: #eef4fb;
+  color: #16375f;
+  border-bottom: 1px solid #cfdcec;
+}
+
+.wa-table.is-light tbody tr:nth-child(even) td,
+.wa-table.is-light tbody tr:hover td {
+  background: #fff;
+}
+
+.wa-table .wa-input {
+  width: 100%;
+  min-width: 110px;
+  padding: 6px 8px;
+  font-size: 12.5px;
+}
+
+/* ---------- Buttons ---------- */
+
+.wa-btn {
+  border: none;
+  border-radius: 4px;
+  padding: 7px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.wa-btn-primary {
+  background: #1f4e88;
+  color: #fff;
+}
+
+.wa-btn-primary:hover {
+  background: #16375f;
+}
+
+.wa-btn-secondary {
+  background: #eef4fb;
+  color: #1f4e88;
+}
+
+.wa-btn-secondary:hover {
+  background: #dfeaf7;
+}
+
+.wa-btn-outline {
+  background: #fff;
+  color: #4a5a72;
+  border: 1px solid #cfdcec;
+}
+
+.wa-btn-danger-outline {
+  background: #fff;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.wa-btn-warn {
+  background: #e67e22;
+  color: #fff;
+}
+
+.wa-btn-warn:hover {
+  background: #cf6d16;
+}
+
+.wa-btn:disabled,
+.wa-btn:disabled:hover {
+  background: #f1f1f1;
+  color: #a5a5a5;
+  border-color: #e6e6e6;
+  cursor: not-allowed;
+}
+
+.wa-btn-lg {
+  padding: 11px 28px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 5px;
+}
+
+/* ---------- Status pills ---------- */
+
+.wa-pill {
+  display: inline-block;
+  border-radius: 3px;
+  padding: 3px 9px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.wa-pill-lg {
+  border-radius: 4px;
+  padding: 7px 16px;
+  font-size: 13px;
+}
+
+.wa-pill-new {
+  background: #fef3e0;
+  color: #8a5a10;
+}
+
+.wa-pill-progress,
+.wa-pill-type {
+  background: #eef4fb;
+  color: #1f4e88;
+}
+
+.wa-pill-completed {
+  background: #e7f6ec;
+  color: #15803d;
+}
+
+.wa-pill-neutral {
+  background: #f6f9fd;
+  color: #5a6b81;
+}
+
+/* ---------- Tooltip (disabled Assignment button) ---------- */
+
+.wa-tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+.wa-tooltip-text {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  background: #16375f;
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 10;
+  transition: opacity 0.15s ease;
+}
+
+.wa-tooltip:hover .wa-tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+.wa-pagination {
+  margin-top: 18px;
+}
+
+/* ---------- Alerts / modal ---------- */
+
+.wa-alert {
+  padding: 12px 16px;
+  border-radius: 4px;
+  font-size: 13.5px;
+  margin-bottom: 20px;
+}
+
+.wa-alert-success {
+  background: #e7f6ec;
+  border: 1px solid #b8e6c6;
+  color: #15803d;
+}
+
+.wa-alert-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+
+.wa-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(22, 55, 95, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.wa-modal {
+  background: #fff;
+  border-radius: 6px;
+  padding: 24px 28px;
+  max-width: 460px;
+  width: 90%;
+  box-shadow: 0 10px 30px rgba(22, 55, 95, 0.25);
+}
+
+.wa-modal h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  color: #16375f;
+}
+
+.wa-modal p {
+  margin: 0 0 18px;
+  font-size: 14px;
+  color: #3d4d63;
+}
+
+/* ---------- Document-style view ---------- */
+
+.wa-doc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding-bottom: 16px;
+  border-bottom: 3px solid #1f4e88;
+}
+
+.wa-doc-head-pills {
+  display: flex;
+  gap: 10px;
+  align-self: center;
+  flex-wrap: wrap;
+}
+
+.wa-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1f4e88;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+.wa-doc-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #16375f;
+  margin-top: 4px;
+}
+
+.wa-doc-section {
+  padding: 22px 0;
+  border-bottom: 1px solid #e6edf6;
+}
+
+.wa-doc-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.wa-doc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+}
+
+.wa-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #5a6b81;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.wa-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #16375f;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  margin: 0 0 12px;
+  text-align: left;
+}
+
+.wa-client-name {
+  font-size: 17px;
+  font-weight: 600;
+  color: #16375f;
+}
+
+.wa-client-contact {
+  font-size: 13.5px;
+  color: #4a5a72;
+  margin-top: 4px;
+}
+
+.wa-kv-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 20px;
+}
+
+.wa-kv-grid.is-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.wa-kv-grid.is-spaced {
+  margin-top: 16px;
+}
+
+.wa-kv-label {
+  color: #5a6b81;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.wa-kv-value {
+  color: #16375f;
+  font-weight: 500;
+  font-size: 13.5px;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+
+.wa-description {
+  font-size: 14px;
+  color: #3d4d63;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.wa-total {
+  margin: 20px 0 0 auto;
+  width: 100%;
+  max-width: 300px;
+  border: 2px solid #1f4e88;
+  border-radius: 6px;
+  background: #f6f9fd;
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.wa-total-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #16375f;
+}
+
+.wa-total-value {
+  font-size: 19px;
+  font-weight: 700;
+  color: #1f4e88;
+}
+
+.wa-total-note {
+  text-align: right;
+  font-size: 12px;
+  color: #5a6b81;
+  margin-top: 6px;
+}
+
+.wa-yes {
+  color: #15803d;
+  font-weight: 700;
+}
+
+.wa-no {
+  color: #a5b1c2;
+}
+
+.wa-doc-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 22px;
+}
+
+/* ---------- Forms ---------- */
+
+.wa-form-heading {
+  margin-bottom: 20px;
+}
+
+.wa-form-section {
+  padding: 20px 0;
+  border-bottom: 1px solid #e6edf6;
+}
+
+.wa-form-section.is-first {
+  padding-top: 0;
+}
+
+.wa-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.wa-field-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #5a6b81;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.wa-field .wa-input,
+.wa-field .wa-select {
+  width: 100%;
+  padding: 9px 10px;
+  font-size: 13.5px;
+}
+
+.wa-field.is-wide {
+  grid-column: span 2;
+}
+
+.wa-field-error {
+  color: #d32f2f;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.wa-hint {
+  font-size: 11.5px;
+  color: #5a6b81;
+  margin-top: 6px;
+}
+
+.wa-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.wa-section-head .wa-field-label {
+  margin-bottom: 0;
+}
+
+.wa-inline-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #3d4d63;
+}
+
+.wa-inline-control .wa-select {
+  width: 120px;
+  padding: 6px 8px;
+}
+
+.wa-rate-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.wa-rate-card {
+  border: 1px solid #e6edf6;
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.wa-rate-card.is-disabled {
+  opacity: 0.5;
+}
+
+.wa-rate-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #16375f;
+  margin-bottom: 8px;
+}
+
+.wa-rate-card-inputs {
+  display: flex;
+  gap: 8px;
+}
+
+.wa-rate-card-inputs .wa-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px;
+}
+
+.wa-rate-card-inputs span {
+  display: block;
+  font-size: 11px;
+  color: #5a6b81;
+  margin-bottom: 4px;
+}
+
+.wa-rate-card-inputs label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.wa-weight-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-top: 4px;
+}
+
+.wa-weight-row .wa-field {
+  min-width: 140px;
+}
+
+.wa-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #3d4d63;
+  cursor: pointer;
+}
+
+.wa-subtable {
+  margin-top: 16px;
+}
+
+.wa-subtable-foot {
+  padding: 10px 12px;
+  background: #f6f9fd;
+  border-top: 1px solid #eef2f8;
+}
+
+.wa-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  padding-top: 22px;
+}
+
+.wa-form-message {
+  margin-right: auto;
+  color: #d32f2f;
+  font-size: 13px;
+}
+
+/* The add-on invoice picker is shared with the older edit screen, which styles
+   it via the controller-instructions classes; restyle it here. */
+.wa-page .controller-instructions-form-field {
+  max-width: none !important;
+}
+
+.wa-page .controller-instructions-form-field > label {
+  display: block;
+  font-size: 11.5px !important;
+  font-weight: 700;
+  color: #5a6b81;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.wa-page .controller-instructions-form-field select {
+  width: 100%;
+  height: auto !important;
+  padding: 9px 10px !important;
+  font-size: 13.5px !important;
+  border: 1px solid #cfdcec;
+  border-radius: 4px;
+  color: #16375f;
+  background: #fff;
+  font-family: inherit;
+}
+
+.wa-page .controller-instructions-error-field {
+  border-color: #d32f2f !important;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 900px) {
+  .wa-subnav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    padding: 12px 16px;
+  }
+
+  .wa-card {
+    padding: 20px;
+  }
+
+  .wa-doc-grid,
+  .wa-form-grid,
+  .wa-rate-cards,
+  .wa-kv-grid.is-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wa-field.is-wide {
+    grid-column: auto;
+  }
+}
