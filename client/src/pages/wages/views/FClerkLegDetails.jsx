@@ -214,7 +214,7 @@ const FClerkLegDetails = () => {
   };
 
   return (
-    <>
+    <div className="finance-clerk-wage-wrapper">
       <div className="legdetails-header">
         <button
           onClick={() =>
@@ -318,7 +318,7 @@ const FClerkLegDetails = () => {
           </tbody>
         </table>
       )}
-    </>
+    </div>
   );
 };
 

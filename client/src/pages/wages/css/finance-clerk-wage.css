@@ -24,7 +24,12 @@
 
 
 
-.table-container {
+/* Page wrapper: no box of its own, so children stay flex items of .content-area */
+.finance-clerk-wage-wrapper {
+  display: contents;
+}
+
+.finance-clerk-wage-wrapper .table-container {
   width: 90%;
   max-width: 800px;
   margin: 0 auto;
@@ -79,7 +84,7 @@
 
 /* Responsive adjustments */
 @media screen and (max-width: 768px) {
-  .table-container {
+  .finance-clerk-wage-wrapper .table-container {
     width: 95%;
   }
 
