@@ -358,7 +358,7 @@ const Instructions = () => {
     navigate("/update-instructions", { state: stateToPass })
   }
   return (
-    <div>
+    <div className="instructions-list-wrapper">
       {/* Centered month and year filters - now positioned ABOVE the company name */}
       <div className="dropdown-container74">
         <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="dropdown">

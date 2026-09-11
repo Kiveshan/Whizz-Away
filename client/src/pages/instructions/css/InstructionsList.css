@@ -98,7 +98,7 @@ body {
   opacity: 0.8;
 }
 
-.table-container {
+.instructions-list-wrapper .table-container {
   overflow-x: auto;
   display: flex;
   justify-content: center;

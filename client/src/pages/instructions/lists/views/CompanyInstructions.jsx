@@ -410,7 +410,7 @@ const CompanyInstructions = () => {
   }
 
   return (
-    <div>
+    <div className="instructions-list-wrapper">
       {/* Centered month and year filters - MOVED ABOVE the company name */}
       <div className="dropdown-container74">
         <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="dropdown">
