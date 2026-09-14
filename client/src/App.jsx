@@ -113,6 +113,7 @@ import {
   WageReports,
   DriverRateAuditReport,
   AuditLogReport,
+  IncompleteInstructionsReport,
   ProfitLossReportsPage,
   ProfitLossDetailPage,
   ClientSubbieCommissionReport,
@@ -198,6 +199,7 @@ function DynamicHeader() {
     "/wage-reports": "Wage Reports",
     "/driver-rate-audit": "Driver Rate Audit",
     "/audit-log": "Audit Log",
+    "/incomplete-instructions": "Incomplete Instructions",
     "/view-client-list": "Add On's",
     "/view-add-on-list": "Add On's",
     "/add-on-form": "Add On's",
@@ -476,6 +478,10 @@ function ContentWrapper() {
         <Route path="/wage-reports" element={<WageReports />} />
         <Route path="/driver-rate-audit" element={<DriverRateAuditReport />} />
         <Route path="/audit-log" element={<AuditLogReport />} />
+        <Route
+          path="/incomplete-instructions"
+          element={<IncompleteInstructionsReport />}
+        />
         <Route
           path="/client-subbie-commission"
           element={<ClientSubbieCommissionReport />}

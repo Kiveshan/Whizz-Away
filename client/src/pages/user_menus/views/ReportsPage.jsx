@@ -38,6 +38,11 @@ const maintenanceData = [
     image: "/images/reports.jpg",
     path: "/audit-log",
   },
+  {
+    title: "Incomplete Instructions",
+    image: "/images/reports.jpg",
+    path: "/incomplete-instructions",
+  },
 ]
 
 const ReportsPage = () => {

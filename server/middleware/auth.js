@@ -139,6 +139,28 @@ const verifyAuditLogAccess = (req, res, next) => {
   return next()
 }
 
+// Read-only Maintenance & Audits reports owned by Manager/Director, plus Admin.
+const verifyReportsAccess = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      error: "Authentication required",
+      message: "You must be logged in to access this resource",
+      code: "NO_USER",
+    })
+  }
+
+  const allowedRoles = [ROLES.MANAGER, ROLES.DIRECTOR, ROLES.ADMIN]
+  if (!allowedRoles.includes(req.user.roleid)) {
+    return res.status(403).json({
+      error: "Unauthorized",
+      message: "You do not have permission to access this resource",
+      code: "INSUFFICIENT_PERMISSIONS",
+    })
+  }
+
+  return next()
+}
+
 // Subcontractor statement exports: producing or reading a frozen statement
 // document is a creditors function, so this mirrors the client-side gate on
 // /Creditors/Subcontractor* in client/src/config/routeRoles.js (roles 8, 1, 4).
@@ -170,6 +192,7 @@ export {
   verifyAdminAccess,
   verifyDriverRateAuditAccess,
   verifyAuditLogAccess,
+  verifyReportsAccess,
   verifySubcontractorStatementAccess,
   authenticateScheduledJob,
 }
