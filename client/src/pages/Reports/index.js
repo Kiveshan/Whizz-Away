@@ -5,3 +5,4 @@ export { default as ClientSubbieCommissionReport } from "./views/ClientSubbieCom
 export { default as VatReconReportPage } from "./views/VatReconReportPage.jsx";
 export { default as DriverRateAuditReport } from "./views/DriverRateAuditReport.jsx";
 export { default as AuditLogReport } from "./views/AuditLogReport.jsx";
+export { default as IncompleteInstructionsReport } from "./views/IncompleteInstructionsReport.jsx";

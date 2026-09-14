@@ -33,6 +33,7 @@ import creditNoteRoutes from "./creditNote/creditNoteRoutes.js";
 import profitLossRoutes from "./profit-loss/profitLossRoutes.js";
 import vatReconRoutes from "./vat-recon/vat-reconRoutes.js";
 import landingRoutes from "./landing/landingRoutes.js";
+import incompleteInstructionsRoutes from "./reports/incompleteInstructionsRoutes.js";
 import { verifyToken } from "../middleware/auth.js";
 import { auditTrail } from "../middleware/auditTrail.js";
 
@@ -97,5 +98,6 @@ router.use(subcontractorsRoutes);
 router.use(addonRoutes);
 router.use(profitLossRoutes);
 router.use(vatReconRoutes);
+router.use(incompleteInstructionsRoutes);
 
 export default router;
