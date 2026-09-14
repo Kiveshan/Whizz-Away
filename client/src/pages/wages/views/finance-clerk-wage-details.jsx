@@ -580,7 +580,7 @@ const filteredInstructions = driverInstructions.filter((instruction) => {
   };
 
   return (
-    <>
+    <div className="finance-clerk-wage-wrapper">
       <div
         style={{
           display: "flex",
@@ -730,7 +730,7 @@ const filteredInstructions = driverInstructions.filter((instruction) => {
           </tbody>
         </table>
       )}
-    </>
+    </div>
   );
 };
 

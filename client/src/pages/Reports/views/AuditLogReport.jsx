@@ -32,6 +32,7 @@ const ENTITY_LABELS = {
   report: "Reports",
   statement: "Statements",
   subcontractor: "Subcontractors",
+  subcontractor_statement: "Subcontractor statements",
   supplier: "Suppliers",
   trailer: "Trailers",
   truck: "Trucks",
