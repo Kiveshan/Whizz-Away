@@ -1,5 +1,15 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import Select from "react-select"
 import api from "../../api.js"
+
+const formatLabel = (addon) => {
+  const amount =
+    addon.amount != null ? `R${Number(addon.amount).toFixed(2)}` : ""
+  const date = addon.date
+    ? new Date(addon.date).toLocaleDateString("en-ZA")
+    : ""
+  return [addon.invoice_number, amount, date].filter(Boolean).join(" — ")
+}
 
 /**
  * Picker for linking an add-on instruction to an existing add-on invoice.
@@ -60,13 +70,44 @@ export function AddonInvoicePicker({
     }
   }, [clientId, instructionId])
 
-  const formatLabel = (addon) => {
-    const amount =
-      addon.amount != null ? `R${Number(addon.amount).toFixed(2)}` : ""
-    const date = addon.date
-      ? new Date(addon.date).toLocaleDateString("en-ZA")
-      : ""
-    return [addon.invoice_number, amount, date].filter(Boolean).join(" — ")
+  // Ordered by invoice number (natural sort so INV-9 comes before INV-10)
+  const selectOptions = useMemo(
+    () =>
+      [...options]
+        .sort((a, b) =>
+          String(a.invoice_number ?? "").localeCompare(
+            String(b.invoice_number ?? ""),
+            undefined,
+            { numeric: true, sensitivity: "base" }
+          )
+        )
+        .map((addon) => ({
+          value: String(addon.addon_id),
+          label: formatLabel(addon),
+        })),
+    [options]
+  )
+
+  const selectedOption =
+    selectOptions.find((opt) => opt.value === String(value)) || null
+
+  const selectStyles = {
+    control: (base, state) => ({
+      ...base,
+      minHeight: "32px",
+      height: "32px",
+      fontSize: "0.8rem",
+      borderColor: error ? "#d32f2f" : state.isFocused ? base.borderColor : "#ced4da",
+      boxShadow: "none",
+    }),
+    valueContainer: (base) => ({ ...base, height: "30px", padding: "0 6px" }),
+    input: (base) => ({ ...base, margin: 0, padding: 0 }),
+    indicatorsContainer: (base) => ({ ...base, height: "30px" }),
+    indicatorSeparator: () => ({ display: "none" }),
+    dropdownIndicator: (base) => ({ ...base, padding: "4px" }),
+    clearIndicator: (base) => ({ ...base, padding: "4px" }),
+    menu: (base) => ({ ...base, fontSize: "0.8rem", minWidth: "260px" }),
+    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
   }
 
   const hintStyle = {
@@ -84,35 +125,28 @@ export function AddonInvoicePicker({
         Add-On Invoice <span style={{ color: "#d32f2f" }}>*</span>
       </label>
       <div className="controller-instructions-input-wrapper">
-        <select
-          className={`controller-instructions-form-input ${
-            error ? "controller-instructions-error-field" : ""
-          }`}
+        <Select
+          inputId="addon_id"
           name="addon_id"
-          value={value || ""}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled || loading || !clientId}
-          style={{
-            width: "100%",
-            fontSize: "0.8rem",
-            padding: "4px 6px",
-            height: "32px",
-          }}
-          title={error || loadError || undefined}
-        >
-          <option value="">
-            {loading
+          options={selectOptions}
+          value={selectedOption}
+          onChange={(opt) => onChange(opt ? opt.value : "")}
+          isDisabled={disabled || loading || !clientId}
+          isLoading={loading}
+          isClearable
+          isSearchable
+          placeholder={
+            loading
               ? "Loading…"
               : !clientId
                 ? "Select a client first"
-                : "Select invoice"}
-          </option>
-          {options.map((addon) => (
-            <option key={addon.addon_id} value={String(addon.addon_id)}>
-              {formatLabel(addon)}
-            </option>
-          ))}
-        </select>
+                : "Search invoice"
+          }
+          noOptionsMessage={() => "No matching invoices"}
+          styles={selectStyles}
+          menuPortalTarget={document.body}
+          aria-invalid={!!error}
+        />
       </div>
       {loadError && (
         <div style={{ ...hintStyle, color: "#d32f2f" }}>{loadError}</div>
