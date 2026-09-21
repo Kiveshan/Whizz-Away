@@ -4,6 +4,19 @@ import Card from "../../../components/Card"
 import "../css/card.css"
 import "../css/dashboard.css"
 
+const categoryData = [
+  {
+    title: "Business Reports",
+    image: "/images/reports.jpg",
+    path: "/reports/business",
+  },
+  {
+    title: "Maintenance & Audits",
+    image: "/images/reports.jpg",
+    path: "/reports/maintenance",
+  },
+]
+
 const insightsData = [
   {
     title: "Wage Reports",
@@ -45,17 +58,26 @@ const maintenanceData = [
   },
 ]
 
-const ReportsPage = () => {
+const sections = {
+  business: { title: "Business Insights", items: insightsData },
+  maintenance: { title: "Maintenance & Audits", items: maintenanceData },
+}
+
+// With no category, shows the two category cards; with a category, shows that
+// category's reports.
+const ReportsPage = ({ category }) => {
   const navigate = useNavigate()
+  const section = sections[category]
 
   const handleNavigation = (path) => {
     navigate(path)
   }
 
   const handleBack = () => {
-    // Navigate back to AnalyticsReportsPage
-    navigate("/analytics-reports")
+    navigate(section ? "/reports" : "/analytics-reports")
   }
+
+  const items = section ? section.items : categoryData
 
   return (
     <div className="dashboard">
@@ -65,21 +87,9 @@ const ReportsPage = () => {
         </button>
       </div>
 
-      <h2 className="dashboard-section-title">Business Insights</h2>
+      {section && <h2 className="dashboard-section-title">{section.title}</h2>}
       <div className="dashboard-row">
-        {insightsData.map((item) => (
-          <Card
-            key={item.title}
-            title={item.title}
-            image={item.image}
-            onClick={() => handleNavigation(item.path)}
-          />
-        ))}
-      </div>
-
-      <h2 className="dashboard-section-title">Maintenance & Audits</h2>
-      <div className="dashboard-row">
-        {maintenanceData.map((item) => (
+        {items.map((item) => (
           <Card
             key={item.title}
             title={item.title}

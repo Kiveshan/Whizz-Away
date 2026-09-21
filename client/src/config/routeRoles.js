@@ -39,6 +39,8 @@ export const ROUTE_ROLES = [
   // ---------- Reports & analytics ----------
   { pattern: "/analytics-reports", roles: [1, 4] },
   { pattern: "/reports", roles: [1, 4] },
+  { pattern: "/reports/business", roles: [1, 4] },
+  { pattern: "/reports/maintenance", roles: [1, 4] },
   { pattern: "/DirectorAnalytics", roles: [4, 1] },
   { pattern: "/wage-reports", roles: [1, 4] },
   { pattern: "/driver-rate-audit", roles: [1, 4] },

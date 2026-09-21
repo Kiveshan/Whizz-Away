@@ -32,7 +32,7 @@ const ProfitLossReportsPage = () => {
     const startYear = 2023
 
     const handleBack = () => {
-        navigate("/reports");
+        navigate("/reports/business");
     };
 
     const getYearOptions = () => {
