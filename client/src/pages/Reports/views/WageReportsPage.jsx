@@ -17,7 +17,7 @@ const WageReportsPage = () => {
   }
 
   const handleBack = () => {
-    navigate("/reports")
+    navigate("/reports/business")
   }
 
 const getYearOptions = () => {

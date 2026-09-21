@@ -305,7 +305,7 @@ const VatReconReportPage = () => {
     ]
 
     const handleBack = () => {
-        navigate("/reports")
+        navigate("/reports/business")
     }
 
     const getYearOptions = () => {

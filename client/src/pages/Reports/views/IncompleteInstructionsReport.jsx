@@ -162,7 +162,7 @@ function IncompleteInstructionsReport() {
   return (
     <div className="driver-rate-audit-wrapper">
       <div className="header-actions">
-        <button onClick={() => navigate("/reports")} className="back-button">
+        <button onClick={() => navigate("/reports/maintenance")} className="back-button">
           Back
         </button>
       </div>

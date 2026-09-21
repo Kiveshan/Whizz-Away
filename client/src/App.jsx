@@ -196,6 +196,8 @@ function DynamicHeader() {
     "/Creditors/SubcontractorStatementDetails": "Subcontractor Statement",
     "/analytics-reports": "Insights",
     "/reports": "Reports",
+    "/reports/business": "Business Reports",
+    "/reports/maintenance": "Maintenance & Audits",
     "/wage-reports": "Wage Reports",
     "/driver-rate-audit": "Driver Rate Audit",
     "/audit-log": "Audit Log",
@@ -271,7 +273,7 @@ function ContentWrapper() {
   const getBackTarget = () => {
     if (isInvoiceDetail) return "/invoices";
     if (isStatementDetail) return "/statements-list";
-    if (isClientSubbieReport) return "/reports";
+    if (isClientSubbieReport) return "/reports/business";
     if (isSubbieStatements) return "/Creditors/SubcontractorList";
     if (isSubbieStatementDetail) return "/Creditors/SubcontractorStatements";
     return null;
@@ -475,6 +477,14 @@ function ContentWrapper() {
         />
         <Route path="/analytics-reports" element={<AnalyticsReportsPage />} />
         <Route path="/reports" element={<ReportsPage />} />
+        <Route
+          path="/reports/business"
+          element={<ReportsPage category="business" />}
+        />
+        <Route
+          path="/reports/maintenance"
+          element={<ReportsPage category="maintenance" />}
+        />
         <Route path="/wage-reports" element={<WageReports />} />
         <Route path="/driver-rate-audit" element={<DriverRateAuditReport />} />
         <Route path="/audit-log" element={<AuditLogReport />} />
@@ -523,6 +533,8 @@ function App() {
     "/Viewcontrollerinstructions": "Viewcontrollerinstructions",
     "/ViewcontrollerInstructionDetails": "ViewcontrollerInstructionDetails",
     "/reports": "Reports",
+    "/reports/business": "Business Reports",
+    "/reports/maintenance": "Maintenance & Audits",
     "/wage-reports": "Wage Reports",
     "/driver-rate-audit": "Driver Rate Audit",
     "/audit-log": "Audit Log",
