@@ -59,7 +59,7 @@ EventBridge fires a Lambda on the 1st of each month. Lambda calls `POST /api/sta
 | Security headers | Helmet | Sensible header defaults in one line; CSP disabled because the server serves the CRA build with an inlined runtime chunk |
 | Rate limiting | express-rate-limit | Applied to the auth routes specifically — brute-force protection where it matters, without throttling normal API use |
 | Request validation | Zod | Schema validation on the financially material write endpoints; coerces the string-typed numbers browsers send |
-| CI/CD | GitHub Actions → AWS Elastic Beanstalk | Push-to-deploy per branch (`staging`, `main`), building client and server into a single versioned artifact |
+| CI/CD | GitHub Actions → AWS Elastic Beanstalk | Push-to-deploy on `main`, building client and server into a single versioned artifact |
 | Database | PostgreSQL | Strong support for JSONB, array types, and window functions required by the analytics queries |
 | Database client | node-postgres (`pg`) — raw SQL | Complex CTEs and lateral joins in the analytics layer are easier to write and reason about in raw SQL than in a query builder |
 | File storage | AWS S3 (af-south-1) | Durable object storage for compliance documents; presigned URLs keep credentials server-side |
@@ -206,9 +206,9 @@ The endpoint authenticates the Lambda with a shared `API_SECRET` bearer token, c
 
 **Alternatives considered:** Static frontend on S3 + CloudFront with the API deployed separately; containerised deployment.
 
-**Why this approach:** One artifact means the frontend and the API it talks to are always the same version — there is no window where a newly deployed client calls an endpoint the server does not have yet, which is the standard failure mode of independently deployed frontends. It also removes CORS from production entirely (same origin), leaving it as a development-only concern for the `localhost:3000` dev server. The `staging` and `main` branches map to separate Elastic Beanstalk environments with their own workflow files, so staging is a genuine pre-production rehearsal of the same artifact shape.
+**Why this approach:** One artifact means the frontend and the API it talks to are always the same version — there is no window where a newly deployed client calls an endpoint the server does not have yet, which is the standard failure mode of independently deployed frontends. It also removes CORS from production entirely (same origin), leaving it as a development-only concern for the `localhost:3000` dev server. Only the `main` branch deploys (to its own Elastic Beanstalk environment); the former staging environment and its workflow have been retired, so there is no pre-production rehearsal environment.
 
-**Trade-offs:** Static assets are served by the application instance rather than a CDN, so there is no edge caching and a frontend-only change requires a full application redeploy. Push-to-deploy on `staging` and `main` means those branches are live by definition — there is no approval gate between merge and deploy. Because the deployed server serves the CRA build with its inlined runtime chunk, `helmet`'s Content-Security-Policy is disabled (`server.js:33`), giving up CSP protection that a separately hosted frontend could have kept.
+**Trade-offs:** Static assets are served by the application instance rather than a CDN, so there is no edge caching and a frontend-only change requires a full application redeploy. Push-to-deploy on `main` means that branch is live by definition — there is no approval gate between merge and deploy, and no staging environment to catch problems first. Because the deployed server serves the CRA build with its inlined runtime chunk, `helmet`'s Content-Security-Policy is disabled (`server.js:33`), giving up CSP protection that a separately hosted frontend could have kept.
 
 ---
 
