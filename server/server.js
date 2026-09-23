@@ -1,5 +1,6 @@
 import express from "express";
 import helmet from "helmet";
+import compression from "compression";
 import expressSession from "express-session";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
@@ -34,6 +35,11 @@ app.use(
     crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
+
+// Gzip responses (JS bundle, CSS, JSON). Done here rather than in nginx because
+// the EB-generated nginx.conf already sets gzip directives, and redefining them
+// in .platform/ would fail nginx's config check and break the deploy.
+app.use(compression());
 
 // Enhanced CORS configuration
 app.use((req, res, next) => {
@@ -186,7 +192,20 @@ if (process.env.NODE_ENV == "deployed") {
   const buildDir = path.join(__dirname, "public", "build");
 
   // Serve built assets (index.html at "/", /static/*, favicon, manifest…).
-  app.use(express.static(buildDir));
+  // Files under /static/ have content hashes in their names, so a new build
+  // always gets new URLs and they can be cached for a year. Everything else
+  // (index.html especially) must be revalidated so deploys are picked up.
+  app.use(
+    express.static(buildDir, {
+      setHeaders: (res, filePath) => {
+        if (filePath.startsWith(path.join(buildDir, "static"))) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else {
+          res.setHeader("Cache-Control", "no-cache");
+        }
+      },
+    })
+  );
 
   // SPA history fallback: browser navigations (Accept: text/html) — the root
   // URL and client-side deep links like /Dashboard — get index.html so React
@@ -194,6 +213,7 @@ if (process.env.NODE_ENV == "deployed") {
   // application/json, not text/html) fall through to the API router below.
   app.get("*", (req, res, next) => {
     if (req.headers.accept && req.headers.accept.includes("text/html")) {
+      res.setHeader("Cache-Control", "no-cache");
       return res.sendFile(path.join(buildDir, "index.html"));
     }
     next();
