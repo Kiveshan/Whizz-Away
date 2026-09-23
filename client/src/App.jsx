@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -15,115 +15,122 @@ import LogoutButton from "./components/LogoutButton";
 import LandingPage from "./pages/user_menus/views/LandingPage";
 import { RequireAuth, RoleGuard } from "./components/ProtectedRoute";
 
-// Import pages
-import {
-  ControllerDashboard,
-  FDashboard,
-  DirectorDashboard,
-  Dashboard,
-  Debtors,
-  DirectorDebtors,
-  DirectorCreditorsDash,
-  DebtorsDashboard,
-  DirectorCreditorsOther,
-  CreditorsOther,
-  CreditorsDashboard,
-  AnalyticsReportsPage,
-  ReportsPage,
-} from "./pages/user_menus";
-import { Login, Register } from "./pages/auth";
-import {
-  ControllerInstructions,
-  ControllerInstructionDetails,
-  FCcontrollerinstructions,
-  ViewClientInstruction,
-  Viewcontrollerinstructions,
-  FCcontrollerInstructionDetails,
-  ViewcontrollerInstructionDetails,
-  CompanyInstructions,
-  CompanyInstructionView,
-  InstructionsList,
-} from "./pages/instructions";
-import {
-  ViewExpense,
-  ExpenseDetails,
-  ExpenseSubmission,
-  DirectorManagerViewFuelExpense,
-  DirectorExpenses,
-} from "./pages/fuel";
-import { DirectorAnalytics } from "./pages/analytics";
-import Manage from "./pages/manage/views/Manage";
-import {
-  ViewClientInvoice,
-  InvoicesList,
-  ClientInvoice,
-} from "./pages/invoices";
-import {
-  ViewClientStatement,
-  StatementsList,
-  ClientStatement,
-} from "./pages/statements";
-import {
-  DirectorFinancialDocumentsView,
-  DirectorClientDocuments,
-  ClientDocuments,
-  FinancialDocumentsView,
-} from "./pages/financial_documents";
-import {
-  FinanceClerkWage,
-  FinanceClerkWageDetails,
-  FClerkLegDetails,
-  FinanceClerkWageSlip,
-} from "./pages/wages";
-import {
-  DirectorClientListPay,
-  DirectorClientPaymentList,
-  ClientPayments,
-  ClientListPay,
-  UploadProof,
-} from "./pages/payments";
-import {
-  UpdateInstruction,
-  DirectorManagerViewAssignment,
-  UploadInstructionDocuments,
-  DirectorDocs,
-} from "./pages/assignments";
-import { AdminDashboard } from "./pages/admin";
+import Login from "./pages/auth/views/Login.jsx";
 
-// Finance Clerk Pages
-import {
-  CreatePO,
-  POForm,
-  FilterPO,
-  ViewPOForm,
-  CredStatements,
-  ViewStatement,
-  SubcontractorList,
-  SubcontractorStatements,
-  SubcontractorStatementDetails,
-  CredClientList,
-  CreditNoteList,
-  CreditNoteForm,
-  CreditNoteView,
-} from "./pages/Creditors";
+// Pages are lazy-loaded so each one (and heavy libs it pulls in, e.g. exceljs,
+// jspdf, html2pdf, chart libraries) is fetched only when its route is opened,
+// instead of every user downloading the whole app up front. The landing and
+// login pages stay eager since they're the entry points.
 
-import { ClientList, AddOnList, AddOnForm } from "./pages/add-ons";
-import DebtorsAgeAnalysis from "./pages/debtors/views/DebtorsAgeAnalysis";
-import {
-  WageReports,
-  DriverRateAuditReport,
-  AuditLogReport,
-  IncompleteInstructionsReport,
-  ProfitLossReportsPage,
-  ProfitLossDetailPage,
-  ClientSubbieCommissionReport,
-  VatReconReportPage,
-} from "./pages/Reports";
+// Route-level dashboards / menus
+const ControllerDashboard = lazy(() => import("./pages/user_menus/views/ControllerDashboard.jsx"));
+const FDashboard = lazy(() => import("./pages/user_menus/views/FDashboard.jsx"));
+const DirectorDashboard = lazy(() => import("./pages/user_menus/views/DirectorDashboard.jsx"));
+const Dashboard = lazy(() => import("./pages/user_menus/views/Dashboard.jsx"));
+const Debtors = lazy(() => import("./pages/user_menus/views/Debtors.jsx"));
+const DirectorDebtors = lazy(() => import("./pages/user_menus/views/DirectorDebtors.jsx"));
+const DirectorCreditorsDash = lazy(() => import("./pages/user_menus/views/DirectorCreditorsDash.jsx"));
+const DebtorsDashboard = lazy(() => import("./pages/user_menus/views/DebtorsDashboard.jsx"));
+const DirectorCreditorsOther = lazy(() => import("./pages/user_menus/views/DirectorCreditorsOther.jsx"));
+const CreditorsOther = lazy(() => import("./pages/user_menus/views/CreditorsOther.jsx"));
+const CreditorsDashboard = lazy(() => import("./pages/user_menus/views/CreditorsDashboard.jsx"));
+const AnalyticsReportsPage = lazy(() => import("./pages/user_menus/views/AnalyticsReportsPage.jsx"));
+const ReportsPage = lazy(() => import("./pages/user_menus/views/ReportsPage.jsx"));
 
-// CSS Imports
-import "./css/components.css";
-import "./css/layout.css";
-import "./css/MonitorInstructions.css";
+// Auth
+const Register = lazy(() => import("./pages/auth/views/Register.jsx"));
+
+// Instructions
+const ControllerInstructions = lazy(() => import("./pages/instructions/createInstruction/views/ControllerInstructions.jsx"));
+const ControllerInstructionDetails = lazy(() => import("./pages/instructions/createInstruction/views/ControllerInstructionDetails.jsx"));
+const CompanyInstructionView = lazy(() => import("./pages/instructions/lists/views/CompanyInstructionView.jsx"));
+const CompanyInstructions = lazy(() => import("./pages/instructions/lists/views/CompanyInstructions.jsx"));
+const ViewClientInstruction = lazy(() => import("./pages/instructions/lists/views/ViewClientInstruction.jsx"));
+const InstructionsList = lazy(() => import("./pages/instructions/lists/views/InstructionsList.jsx"));
+const Viewcontrollerinstructions = lazy(() => import("./pages/instructions/viewInstruction/views/Viewcontrollerinstructions.jsx"));
+const ViewcontrollerInstructionDetails = lazy(() => import("./pages/instructions/viewInstruction/views/ViewcontrollerInstructionDetails.jsx"));
+const FCcontrollerinstructions = lazy(() => import("./pages/instructions/updateInstruction/views/FCcontrollerinstructions.jsx"));
+const FCcontrollerInstructionDetails = lazy(() => import("./pages/instructions/updateInstruction/views/FCcontrollerInstructionDetails.jsx"));
+
+// Fuel
+const ViewExpense = lazy(() => import("./pages/fuel/views/ViewExpense.jsx"));
+const ExpenseDetails = lazy(() => import("./pages/fuel/views/ExpenseDetails.jsx"));
+const ExpenseSubmission = lazy(() => import("./pages/fuel/views/ExpenseSubmission.jsx"));
+const DirectorManagerViewFuelExpense = lazy(() => import("./pages/fuel/views/DirectorManagerViewFuelExpense.jsx"));
+const DirectorExpenses = lazy(() => import("./pages/fuel/views/DirectorExpenses.jsx"));
+
+// Analytics / manage
+const DirectorAnalytics = lazy(() => import("./pages/analytics/views/DirectorAnalytics.jsx"));
+const Manage = lazy(() => import("./pages/manage/views/Manage.jsx"));
+
+// Invoices
+const ViewClientInvoice = lazy(() => import("./pages/invoices/views/ViewClientInvoice.jsx"));
+const InvoicesList = lazy(() => import("./pages/invoices/views/InvoicesList.jsx"));
+const ClientInvoice = lazy(() => import("./pages/invoices/views/ClientInvoice.jsx"));
+
+// Statements
+const ViewClientStatement = lazy(() => import("./pages/statements/views/ViewClientStatements.jsx"));
+const StatementsList = lazy(() => import("./pages/statements/views/StatementsList.jsx"));
+const ClientStatement = lazy(() => import("./pages/statements/views/ClientStatement.jsx"));
+
+// Financial documents
+const DirectorFinancialDocumentsView = lazy(() => import("./pages/financial_documents/views/DirectorFinancialDocumentsView.jsx"));
+const DirectorClientDocuments = lazy(() => import("./pages/financial_documents/views/DirectorClientDocuments.jsx"));
+const ClientDocuments = lazy(() => import("./pages/financial_documents/views/ClientDocuments.jsx"));
+const FinancialDocumentsView = lazy(() => import("./pages/financial_documents/views/FinancialDocumentsView.jsx"));
+
+// Wages
+const FinanceClerkWage = lazy(() => import("./pages/wages/views/finance-clerk-wage.jsx"));
+const FinanceClerkWageDetails = lazy(() => import("./pages/wages/views/finance-clerk-wage-details.jsx"));
+const FClerkLegDetails = lazy(() => import("./pages/wages/views/FClerkLegDetails.jsx"));
+const FinanceClerkWageSlip = lazy(() => import("./pages/wages/views/finance-clerk-wage-slip.jsx"));
+
+// Payments
+const DirectorClientListPay = lazy(() => import("./pages/payments/views/DirectorClientListPay.jsx"));
+const DirectorClientPaymentList = lazy(() => import("./pages/payments/views/DirectorClientPaymentList.jsx"));
+const ClientPayments = lazy(() => import("./pages/payments/views/ClientPaymentList.jsx"));
+const ClientListPay = lazy(() => import("./pages/payments/views/ClientListPay.jsx"));
+const UploadProof = lazy(() => import("./pages/payments/views/UploadProof.jsx"));
+
+// Assignments
+const UpdateInstruction = lazy(() => import("./pages/assignments/views/UpdateInstuction.jsx"));
+const DirectorManagerViewAssignment = lazy(() => import("./pages/assignments/views/DirectorManagerViewAssignment.jsx"));
+const UploadInstructionDocuments = lazy(() => import("./pages/assignments/views/UploadInstructionDocuments.jsx"));
+const DirectorDocs = lazy(() => import("./pages/assignments/views/DirectorDocs.jsx"));
+
+// Admin
+const AdminDashboard = lazy(() => import("./pages/admin/views/AdminDashboard.jsx"));
+
+// Creditors
+const CreatePO = lazy(() => import("./pages/Creditors/purchaseOrder/views/CreatePO.jsx"));
+const POForm = lazy(() => import("./pages/Creditors/purchaseOrder/views/POForm.jsx"));
+const FilterPO = lazy(() => import("./pages/Creditors/purchaseOrder/views/FilterPO.jsx"));
+const ViewPOForm = lazy(() => import("./pages/Creditors/purchaseOrder/views/ViewPOForm.jsx"));
+const CredStatements = lazy(() => import("./pages/Creditors/Statements/views/CredStatements.jsx"));
+const ViewStatement = lazy(() => import("./pages/Creditors/Statements/views/ViewStatement.jsx"));
+const SubcontractorList = lazy(() => import("./pages/Creditors/subContractors/views/SubcontractorList.jsx"));
+const SubcontractorStatements = lazy(() => import("./pages/Creditors/subContractors/views/SubcontractorStatements.jsx"));
+const SubcontractorStatementDetails = lazy(() => import("./pages/Creditors/subContractors/views/SubcontractorStatementDetails.jsx"));
+const CredClientList = lazy(() => import("./pages/Creditors/CreditNote/CredClientList.jsx"));
+const CreditNoteList = lazy(() => import("./pages/Creditors/CreditNote/CreditNoteList.jsx"));
+const CreditNoteForm = lazy(() => import("./pages/Creditors/CreditNote/CreditNoteForm.jsx"));
+const CreditNoteView = lazy(() => import("./pages/Creditors/CreditNote/CreditNoteView.jsx"));
+
+// Add-ons / debtors
+const ClientList = lazy(() => import("./pages/add-ons/views/ClientList.jsx"));
+const AddOnList = lazy(() => import("./pages/add-ons/views/AddOnList.jsx"));
+const AddOnForm = lazy(() => import("./pages/add-ons/views/AddOnForm.jsx"));
+const DebtorsAgeAnalysis = lazy(() => import("./pages/debtors/views/DebtorsAgeAnalysis.jsx"));
+
+// Reports
+const WageReports = lazy(() => import("./pages/Reports/views/WageReportsPage.jsx"));
+const DriverRateAuditReport = lazy(() => import("./pages/Reports/views/DriverRateAuditReport.jsx"));
+const AuditLogReport = lazy(() => import("./pages/Reports/views/AuditLogReport.jsx"));
+const IncompleteInstructionsReport = lazy(() => import("./pages/Reports/views/IncompleteInstructionsReport.jsx"));
+const ProfitLossReportsPage = lazy(() => import("./pages/Reports/views/ProfitLossReportsPage.jsx"));
+const ProfitLossDetailPage = lazy(() => import("./pages/Reports/views/ProfitLossDetailPage.jsx"));
+const ClientSubbieCommissionReport = lazy(() => import("./pages/Reports/views/ClientSubbieCommissionReport.jsx"));
+const VatReconReportPage = lazy(() => import("./pages/Reports/views/VatReconReportPage.jsx"));
 
 function DynamicHeader() {
   const location = useLocation();
@@ -310,6 +317,7 @@ function ContentWrapper() {
           </div>
         )
       )}
+      <Suspense fallback={<div className="loading">Loading...</div>}>
       <Routes>
         {/* ---------- Public (pre-auth) routes ---------- */}
         <Route path="/" element={<LandingPage />} />
@@ -514,6 +522,7 @@ function ContentWrapper() {
         </Route>
         </Route>
       </Routes>
+      </Suspense>
       {shouldShowFooter && <Footer />} {/* Conditionally render footer */}
     </div>
   );
