@@ -217,6 +217,106 @@
   background-color: #fafbfc;
 }
 
+.alr-row-expandable {
+  cursor: pointer;
+}
+
+.alr-row-expandable:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
+.alr-row-expanded {
+  background-color: #f5f8fc;
+}
+
+.alr-chevron {
+  display: inline-block;
+  width: 14px;
+  margin-right: 4px;
+  color: #6b7280;
+}
+
+.alr-outcome-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background-color: #fdecea;
+  color: #b42318;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.alr-changes-cell {
+  color: #374151;
+  max-width: 420px;
+}
+
+/* A money value that dropped to R0 — the case that started this feature. */
+.alr-zeroed,
+.alr-changes-table tr.alr-zeroed td {
+  color: #b42318;
+  font-weight: 600;
+}
+
+.alr-changes-table tr.alr-zeroed {
+  background-color: #fff5f4;
+}
+
+.alr-detail-row > td {
+  background-color: #f9fafb;
+  padding: 12px 16px 16px 30px;
+}
+
+.alr-changes-table {
+  width: 100%;
+  max-width: 820px;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.83rem;
+}
+
+.alr-changes-table th {
+  position: static;
+  background: #f3f4f6;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #555;
+}
+
+.alr-change-value {
+  white-space: pre-wrap; /* keep stray spaces in route names visible */
+  word-break: break-word;
+}
+
+.alr-request {
+  margin-top: 12px;
+}
+
+.alr-request-line {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.alr-request-data {
+  max-height: 260px;
+  overflow: auto;
+  margin: 0;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 @media (max-width: 720px) {
   .alr-filters {
     flex-direction: column;

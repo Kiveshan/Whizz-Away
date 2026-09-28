@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { Fragment, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../api.js";
 import Pagination from "../../../components/Pagination";
@@ -55,11 +55,22 @@ const isoDaysAgo = (days) => {
   return date.toISOString().slice(0, 10);
 };
 
+// A short line for the table cell: changes that dropped to R0 first, capped so
+// the row stays one line. The full list is in the expanded row.
+const summariseChanges = (changes, max = 2) => {
+  const ordered = [...changes.filter((c) => c.zeroed), ...changes.filter((c) => !c.zeroed)];
+  const shown = ordered.slice(0, max).map((c) => `${c.label}: ${c.from} → ${c.to}`);
+  const extra = ordered.length - shown.length;
+  return shown.join("; ") + (extra > 0 ? ` (+${extra} more)` : "");
+};
+
+const OUTCOME_LABELS = { FAILURE: "Failed", DENIED: "Denied" };
+
 // `embedded` drops the report-page chrome (back button, subtitle) for callers
 // — like the Admin dashboard — that already provide their own frame. What the
 // log contains is decided by the server from the caller's role: Admin gets the
-// full trail, Manager/Director get the business view (no system/unmapped
-// actions, no failed requests, no System Admin actions).
+// full trail with raw request data; Manager/Director get every action except
+// internet-scanner noise and System Admin's own actions.
 function AuditLogReport({ embedded = false }) {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
@@ -77,6 +88,7 @@ function AuditLogReport({ embedded = false }) {
   const [searchInput, setSearchInput] = useState("");
   const [from, setFrom] = useState(() => isoDaysAgo(DEFAULT_WINDOW_DAYS));
   const [to, setTo] = useState("");
+  const [expandedId, setExpandedId] = useState(null);
 
   const fetchAuditLog = useCallback(async () => {
     try {
@@ -155,8 +167,9 @@ function AuditLogReport({ embedded = false }) {
           </div>
 
           <p className="alr-subtitle">
-            Every business action — instructions, invoices, payments, rates and
-            other record changes — with who did it and when. Read-only.
+            Every tracked action across the system — logins, approvals, edits and
+            deletions — with who did it, when, and what happened. Click a row to
+            see exactly what changed. Read-only.
           </p>
         </>
       )}
@@ -218,7 +231,7 @@ function AuditLogReport({ embedded = false }) {
             <label>Search</label>
             <input
               type="text"
-              placeholder="Actor, target, path or details…"
+              placeholder="Instruction no., actor, target or details…"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               aria-label="Search audit log"
@@ -268,25 +281,112 @@ function AuditLogReport({ embedded = false }) {
                     <th>Entity</th>
                     <th>Actor</th>
                     <th>Target</th>
+                    <th>Changes</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((entry) => (
-                    <tr key={entry.audit_id} className="alr-row">
-                      <td className="alr-timestamp">{formatTimestamp(entry.timestamp)}</td>
-                      <td>
-                        <span className="alr-action-badge">
-                          {entry.action_type.replaceAll("_", " ")}
-                        </span>
-                      </td>
-                      <td>{entry.entity_type ? entityLabel(entry.entity_type) : "—"}</td>
-                      <td>
-                        {entry.actor_name ||
-                          (entry.admin_id != null ? `User ${entry.admin_id}` : "—")}
-                      </td>
-                      <td>{entry.target_name || entry.target_id || "—"}</td>
-                    </tr>
-                  ))}
+                  {items.map((entry) => {
+                    const changes = Array.isArray(entry.changes) ? entry.changes : null;
+                    const hasZeroed = changes?.some((c) => c.zeroed);
+                    // Admin rows carry the raw request, so there is always
+                    // something to show; other viewers expand only for changes.
+                    const expandable = Boolean(changes?.length || entry.metadata);
+                    const expanded = expandedId === entry.audit_id;
+                    const toggle = () => setExpandedId(expanded ? null : entry.audit_id);
+
+                    return (
+                      <Fragment key={entry.audit_id}>
+                        <tr
+                          className={`alr-row ${expandable ? "alr-row-expandable" : ""} ${expanded ? "alr-row-expanded" : ""}`}
+                          onClick={expandable ? toggle : undefined}
+                          onKeyDown={
+                            expandable
+                              ? (e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    toggle();
+                                  }
+                                }
+                              : undefined
+                          }
+                          tabIndex={expandable ? 0 : undefined}
+                          aria-expanded={expandable ? expanded : undefined}
+                        >
+                          <td className="alr-timestamp">
+                            {expandable && (
+                              <span className="alr-chevron" aria-hidden="true">
+                                {expanded ? "▾" : "▸"}
+                              </span>
+                            )}
+                            {formatTimestamp(entry.timestamp)}
+                          </td>
+                          <td>
+                            <span className="alr-action-badge">
+                              {entry.action_type.replaceAll("_", " ")}
+                            </span>
+                            {OUTCOME_LABELS[entry.outcome] && (
+                              <span className="alr-outcome-badge">
+                                {OUTCOME_LABELS[entry.outcome]}
+                              </span>
+                            )}
+                          </td>
+                          <td>{entry.entity_type ? entityLabel(entry.entity_type) : "—"}</td>
+                          <td>
+                            {entry.actor_name ||
+                              (entry.admin_id != null ? `User ${entry.admin_id}` : "—")}
+                          </td>
+                          <td>{entry.target_name || entry.target_id || "—"}</td>
+                          <td className={`alr-changes-cell ${hasZeroed ? "alr-zeroed" : ""}`}>
+                            {changes
+                              ? changes.length
+                                ? summariseChanges(changes)
+                                : "No changes"
+                              : "—"}
+                          </td>
+                        </tr>
+
+                        {expanded && (
+                          <tr className="alr-detail-row">
+                            <td colSpan={6}>
+                              {changes?.length > 0 && (
+                                <table className="alr-changes-table">
+                                  <thead>
+                                    <tr>
+                                      <th>Field</th>
+                                      <th>Before</th>
+                                      <th>After</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {changes.map((c, i) => (
+                                      <tr key={i} className={c.zeroed ? "alr-zeroed" : ""}>
+                                        <td>{c.label}</td>
+                                        <td className="alr-change-value">{c.from}</td>
+                                        <td className="alr-change-value">{c.to}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              )}
+
+                              {entry.metadata && (
+                                <div className="alr-request">
+                                  <div className="alr-request-line">
+                                    {entry.http_method} {entry.request_path} → {entry.status_code}{" "}
+                                    {entry.outcome}
+                                    {entry.ip_address ? ` · ${entry.ip_address}` : ""}
+                                  </div>
+                                  <pre className="alr-request-data">
+                                    {JSON.stringify(entry.metadata, null, 2)}
+                                  </pre>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
