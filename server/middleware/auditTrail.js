@@ -98,7 +98,7 @@ const outcomeFor = (status) => {
 };
 
 const actorLabel = (user) => {
-  if (!user) return "Unauthenticated request";
+  if (!user) return "Not signed in";
   const name = [user.name, user.surname].filter(Boolean).join(" ");
   return name ? `${name} (user ${user.userid})` : `User ${user.userid}`;
 };
