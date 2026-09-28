@@ -1,5 +1,10 @@
 import { pool } from "../../config/database.js";
-import { AUDIT_ACTION_TYPES, AUDIT_ENTITY_TYPES } from "../../config/auditActions.js";
+import {
+  AUDIT_ACTION_TYPES,
+  AUDIT_ENTITY_TYPES,
+  AUDIT_BUSINESS_ACTION_TYPES,
+  AUDIT_BUSINESS_ENTITY_TYPES,
+} from "../../config/auditActions.js";
 import { ROLES } from "../../config/roles.js";
 
 const getPendingUsers = async () => {
@@ -287,6 +292,7 @@ const getAuditLog = async ({
   from,
   to,
   hideAdminActors = false,
+  businessOnly = false,
 }) => {
   const conditions = [];
   const params = [];
@@ -339,6 +345,16 @@ const getAuditLog = async ({
   if (hideAdminActors) {
     params.push(ROLES.ADMIN);
     conditions.push(`a.actor_role IS DISTINCT FROM $${params.length}`);
+  }
+
+  // Business view (Manager/Director): only actions on the business allowlist,
+  // and only ones that actually happened. Failed/denied requests are left out
+  // because the viewer shows no outcome column — a failed "FC instruction
+  // updated" would otherwise read as a change that was made.
+  if (businessOnly) {
+    params.push(AUDIT_BUSINESS_ACTION_TYPES);
+    conditions.push(`a.action_type = ANY($${params.length}::text[])`);
+    conditions.push(`a.outcome = 'SUCCESS'`);
   }
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -398,7 +414,10 @@ const getAuditLog = async ({
 
   // Filter values come from the (cached) legacy scan plus the static registry —
   // see getAuditFilterValues.
-  const { actionTypes, entityTypes } = await getAuditFilterValues();
+  // The business view offers only its own allowlist — no historic scan needed.
+  const { actionTypes, entityTypes } = businessOnly
+    ? { actionTypes: AUDIT_BUSINESS_ACTION_TYPES, entityTypes: AUDIT_BUSINESS_ENTITY_TYPES }
+    : await getAuditFilterValues();
 
   return {
     items: result.rows,

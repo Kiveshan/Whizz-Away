@@ -56,10 +56,10 @@ const isoDaysAgo = (days) => {
 };
 
 // `embedded` drops the report-page chrome (back button, subtitle) for callers
-// — like the Admin dashboard — that already provide their own frame. It also
-// switches off the System Admin actor filter: the Reports view (Manager/
-// Director) hides Admin's own actions, but the Admin dashboard's own audit
-// tab should still show everything, including Admin's actions.
+// — like the Admin dashboard — that already provide their own frame. What the
+// log contains is decided by the server from the caller's role: Admin gets the
+// full trail, Manager/Director get the business view (no system/unmapped
+// actions, no failed requests, no System Admin actions).
 function AuditLogReport({ embedded = false }) {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
@@ -91,7 +91,6 @@ function AuditLogReport({ embedded = false }) {
           search: search || undefined,
           from: from || undefined,
           to: to || undefined,
-          hideAdminActors: embedded ? undefined : true,
         },
       });
       setItems(response.data.items);
@@ -104,7 +103,7 @@ function AuditLogReport({ embedded = false }) {
     } finally {
       setLoading(false);
     }
-  }, [page, actionType, entityType, search, from, to, embedded]);
+  }, [page, actionType, entityType, search, from, to]);
 
   useEffect(() => {
     fetchAuditLog();
@@ -156,8 +155,8 @@ function AuditLogReport({ embedded = false }) {
           </div>
 
           <p className="alr-subtitle">
-            Every tracked action across the system — logins, approvals, edits and
-            deletions — with who did it, when, and what happened. Read-only.
+            Every business action — instructions, invoices, payments, rates and
+            other record changes — with who did it and when. Read-only.
           </p>
         </>
       )}

@@ -232,6 +232,13 @@ export const auditTrail = () => async (req, res, next) => {
     const user = req.user || req.session?.user || null;
     const scheduledJob = req.isScheduledJob === true;
 
+    // Internet scanners POST to /wp-login.php, /xmlrpc.php, /.env and the like
+    // all day. An anonymous request to a route we don't have, which the guard
+    // or 404 handler rejected, changed nothing and says nothing about the
+    // business — it only buries real UNMAPPED_* rows. An unmapped request that
+    // succeeded, or came from a signed-in user, is still recorded.
+    if (!descriptor.mapped && !user && !scheduledJob && outcome !== "SUCCESS") return;
+
     logAudit({
       actionType: descriptor.action,
       entityType: descriptor.entity,

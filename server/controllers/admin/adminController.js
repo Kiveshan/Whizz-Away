@@ -158,8 +158,11 @@ const reactivateCompanyHandler = async (req, res) => {
 
 const getAuditLogHandler = async (req, res) => {
   try {
-    const { page, limit, actionType, entityType, outcome, actorId, search, from, to, hideAdminActors } =
-      req.query;
+    const { page, limit, actionType, entityType, outcome, actorId, search, from, to } = req.query;
+    // The view is decided here from the caller's role, never from the query
+    // string: Admin sees the full trail; Manager/Director get the business view
+    // with System Admin's own actions hidden.
+    const isAdmin = req.user.roleid === ROLES.ADMIN;
     const result = await getAuditLog({
       page,
       limit,
@@ -170,7 +173,8 @@ const getAuditLogHandler = async (req, res) => {
       search,
       from,
       to,
-      hideAdminActors: hideAdminActors === "true",
+      hideAdminActors: !isAdmin,
+      businessOnly: !isAdmin,
     });
     res.json(result);
   } catch (err) {
