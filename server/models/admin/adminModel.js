@@ -1,10 +1,5 @@
 import { pool } from "../../config/database.js";
-import {
-  AUDIT_ACTION_TYPES,
-  AUDIT_ENTITY_TYPES,
-  AUDIT_BUSINESS_ACTION_TYPES,
-  AUDIT_BUSINESS_ENTITY_TYPES,
-} from "../../config/auditActions.js";
+import { AUDIT_ACTION_TYPES, AUDIT_ENTITY_TYPES } from "../../config/auditActions.js";
 import { ROLES } from "../../config/roles.js";
 
 const getPendingUsers = async () => {
@@ -292,7 +287,8 @@ const getAuditLog = async ({
   from,
   to,
   hideAdminActors = false,
-  businessOnly = false,
+  hideBotTraffic = false,
+  includeRequestData = false,
 }) => {
   const conditions = [];
   const params = [];
@@ -322,13 +318,18 @@ const getAuditLog = async ({
     conditions.push(`a.admin_id = $${params.length}`);
   }
   if (search) {
-    params.push(`%${search}%`);
+    // Second param is the bare term, so "2242" also finds the record with that
+    // exact id without the pattern matching 12242.
+    params.push(`%${search}%`, search);
+    const like = params.length - 1;
+    const exact = params.length;
     conditions.push(
-      `(a.target_employee_name ILIKE $${params.length}
-        OR a.details ILIKE $${params.length}
-        OR a.actor_name ILIKE $${params.length}
-        OR a.request_path ILIKE $${params.length}
-        OR a.action_type ILIKE $${params.length})`
+      `(a.target_employee_name ILIKE $${like}
+        OR a.details ILIKE $${like}
+        OR a.actor_name ILIKE $${like}
+        OR a.request_path ILIKE $${like}
+        OR a.action_type ILIKE $${like}
+        OR a.target_employee_id::text = $${exact})`
     );
   }
   if (from) {
@@ -347,14 +348,14 @@ const getAuditLog = async ({
     conditions.push(`a.actor_role IS DISTINCT FROM $${params.length}`);
   }
 
-  // Business view (Manager/Director): only actions on the business allowlist,
-  // and only ones that actually happened. Failed/denied requests are left out
-  // because the viewer shows no outcome column — a failed "FC instruction
-  // updated" would otherwise read as a change that was made.
-  if (businessOnly) {
-    params.push(AUDIT_BUSINESS_ACTION_TYPES);
-    conditions.push(`a.action_type = ANY($${params.length}::text[])`);
-    conditions.push(`a.outcome = 'SUCCESS'`);
+  // Internet-scanner noise: anonymous requests to routes the app doesn't have
+  // (/wp-login.php, /.env, …) that were rejected. New ones are no longer
+  // written (see auditTrail.js); this hides the ones recorded before that.
+  if (hideBotTraffic) {
+    conditions.push(
+      `NOT (a.action_type LIKE 'UNMAPPED\\_%' AND a.admin_id IS NULL
+            AND a.outcome IS DISTINCT FROM 'SUCCESS')`
+    );
   }
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -387,7 +388,10 @@ const getAuditLog = async ({
        a.target_employee_name AS target_name,
        a.timestamp,
        a.details,
-       a.metadata,
+       -- The before/after list is for every viewer; the raw request payload
+       -- (bodies, params) is Admin-only.
+       a.metadata->'changes' AS changes,
+       ${includeRequestData ? "a.metadata" : "NULL"} AS metadata,
        a.http_method,
        a.request_path,
        a.status_code,
@@ -414,10 +418,7 @@ const getAuditLog = async ({
 
   // Filter values come from the (cached) legacy scan plus the static registry —
   // see getAuditFilterValues.
-  // The business view offers only its own allowlist — no historic scan needed.
-  const { actionTypes, entityTypes } = businessOnly
-    ? { actionTypes: AUDIT_BUSINESS_ACTION_TYPES, entityTypes: AUDIT_BUSINESS_ENTITY_TYPES }
-    : await getAuditFilterValues();
+  const { actionTypes, entityTypes } = await getAuditFilterValues();
 
   return {
     items: result.rows,

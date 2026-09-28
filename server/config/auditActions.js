@@ -20,9 +20,6 @@
  *   entity    entity_type discriminator, kept in sync with the viewer's filter.
  *   target    Name of the path param holding the affected record's id.
  *   sensitive Audit this route even though it is a read.
- *   system    Operational/technical action (previews, calculations, account
- *             administration). Recorded and shown to Admin, but left out of
- *             the business view Manager/Director see.
  */
 
 // ---------------------------------------------------------------------------
@@ -53,8 +50,8 @@ export const AUDIT_ROUTES = [
   { method: "POST", path: "/admin/approve-user", action: "USER_APPROVED", entity: "user" },
   { method: "POST", path: "/admin/reject-user", action: "USER_REJECTED", entity: "user" },
   { method: "POST", path: "/api/admin/user-status", action: "USER_STATUS_UPDATED", entity: "user" },
-  { method: "POST", path: "/api/company/deactivate", action: "COMPANY_DEACTIVATED", entity: "company", system: true },
-  { method: "POST", path: "/api/company/reactivate", action: "COMPANY_REACTIVATED", entity: "company", system: true },
+  { method: "POST", path: "/api/company/deactivate", action: "COMPANY_DEACTIVATED", entity: "company" },
+  { method: "POST", path: "/api/company/reactivate", action: "COMPANY_REACTIVATED", entity: "company" },
   { method: "GET", path: "/api/admin/audit-log", action: "AUDIT_LOG_VIEWED", entity: "audit", sensitive: true },
   { method: "GET", path: "/admin/pending-users", action: "PENDING_USERS_VIEWED", entity: "user", sensitive: true },
 
@@ -136,7 +133,7 @@ export const AUDIT_ROUTES = [
   // --- Invoices ------------------------------------------------------------
   { method: "POST", path: "/api/invoice/create", action: "INVOICE_CREATED", entity: "invoice" },
   { method: "PUT", path: "/api/invoice/update-instruction", action: "INVOICE_INSTRUCTION_UPDATED", entity: "invoice" },
-  { method: "POST", path: "/api/invoices/preview/:instructionId", action: "INVOICE_PREVIEW_GENERATED", entity: "invoice", target: "instructionId", system: true },
+  { method: "POST", path: "/api/invoices/preview/:instructionId", action: "INVOICE_PREVIEW_GENERATED", entity: "invoice", target: "instructionId" },
   { method: "POST", path: "/generate-invoice/:instructionId", action: "INVOICE_GENERATED", entity: "invoice", target: "instructionId" },
 
   // --- Payments & credit notes ---------------------------------------------
@@ -175,7 +172,7 @@ export const AUDIT_ROUTES = [
   // --- Purchase orders -----------------------------------------------------
   { method: "POST", path: "/api/po-form/create", action: "PURCHASE_ORDER_CREATED", entity: "purchase_order" },
   { method: "POST", path: "/api/po-form/create-multiple", action: "PURCHASE_ORDERS_CREATED", entity: "purchase_order" },
-  { method: "POST", path: "/api/po-form/calculate", action: "PURCHASE_ORDER_CALCULATED", entity: "purchase_order", system: true },
+  { method: "POST", path: "/api/po-form/calculate", action: "PURCHASE_ORDER_CALCULATED", entity: "purchase_order" },
   { method: "POST", path: "/api/po-form/upload-slip", action: "PURCHASE_ORDER_SLIP_UPLOADED", entity: "purchase_order" },
   { method: "DELETE", path: "/api/purchase-orders/:ponum", action: "PURCHASE_ORDER_DELETED", entity: "purchase_order", target: "ponum" },
   { method: "GET", path: "/api/po-form/view-slip/:ponum", action: "PURCHASE_ORDER_SLIP_VIEWED", entity: "purchase_order", target: "ponum", sensitive: true },
@@ -214,28 +211,6 @@ export const AUDIT_ENTITY_TYPES = [
 
 export const AUDIT_ACTION_TYPES = [
   ...new Set([...AUDIT_ROUTES.map((r) => r.action), ...AUDIT_MANUAL_ACTION_TYPES]),
-].sort();
-
-// ---------------------------------------------------------------------------
-// Business view (Manager/Director). An allowlist rather than a blocklist, so
-// anything new or unregistered — UNMAPPED_* rows, a route added without an
-// entry here — stays admin-only until someone decides it belongs to the
-// business. Sign-in, user accounts and the audit trail itself describe how the
-// app is operated, not the business, so those whole entities are left out.
-// ---------------------------------------------------------------------------
-const SYSTEM_ENTITIES = new Set(["auth", "user", "audit"]);
-const BUSINESS_MANUAL_ACTION_TYPES = ["EMPLOYEE_CREATION"];
-
-const BUSINESS_ROUTES = AUDIT_ROUTES.filter(
-  (r) => !r.system && !SYSTEM_ENTITIES.has(r.entity)
-);
-
-export const AUDIT_BUSINESS_ACTION_TYPES = [
-  ...new Set([...BUSINESS_ROUTES.map((r) => r.action), ...BUSINESS_MANUAL_ACTION_TYPES]),
-].sort();
-
-export const AUDIT_BUSINESS_ENTITY_TYPES = [
-  ...new Set([...BUSINESS_ROUTES.map((r) => r.entity), "employee"]),
 ].sort();
 
 // ---------------------------------------------------------------------------

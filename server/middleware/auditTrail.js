@@ -15,6 +15,7 @@
 
 import { resolveAuditRoute } from "../config/auditActions.js";
 import { logAudit, clientIp } from "../utils/auditLogger.js";
+import { summariseChanges } from "../utils/auditChanges.js";
 import { pool } from "../config/database.js";
 
 // Anything whose key looks like a secret never reaches the database.
@@ -239,19 +240,31 @@ export const auditTrail = () => async (req, res, next) => {
     // succeeded, or came from a signed-in user, is still recorded.
     if (!descriptor.mapped && !user && !scheduledJob && outcome !== "SUCCESS") return;
 
+    const actor = scheduledJob ? "Scheduled job" : actorLabel(user);
+
+    // A controller can attach a before/after list (req.auditChanges, see
+    // utils/auditChanges.js). It is added after buildMetadata's size cap so a
+    // truncated request body never costs us the change list, and it replaces
+    // the technical details line with a readable summary — method, path and
+    // status are still in their own columns.
+    const changes = Array.isArray(req.auditChanges) ? req.auditChanges : null;
+    let metadata = buildMetadata(req, descriptor.params);
+    if (changes) metadata = { ...(metadata || {}), changes };
+
     logAudit({
       actionType: descriptor.action,
       entityType: descriptor.entity,
       actorId: user?.userid ?? null,
-      actorName: scheduledJob ? "Scheduled job" : actorLabel(user),
+      actorName: actor,
       actorRole: user?.roleid ?? null,
       targetId: descriptor.target,
       targetName: resolvedTargetName || (descriptor.target ? `${descriptor.entity} ${descriptor.target}` : null),
-      details:
-        `${scheduledJob ? "Scheduled job" : actorLabel(user)} — ${descriptor.action} ` +
-        `(${req.method} ${req.originalUrl.split("?")[0]}) → ${res.statusCode} ${outcome}` +
-        (descriptor.mapped ? "" : " [route not in audit registry]"),
-      metadata: buildMetadata(req, descriptor.params),
+      details: changes
+        ? `${actor} — ${summariseChanges(changes)}`
+        : `${actor} — ${descriptor.action} ` +
+          `(${req.method} ${req.originalUrl.split("?")[0]}) → ${res.statusCode} ${outcome}` +
+          (descriptor.mapped ? "" : " [route not in audit registry]"),
+      metadata,
       httpMethod: req.method,
       requestPath: req.originalUrl.split("?")[0],
       statusCode: res.statusCode,

@@ -160,8 +160,9 @@ const getAuditLogHandler = async (req, res) => {
   try {
     const { page, limit, actionType, entityType, outcome, actorId, search, from, to } = req.query;
     // The view is decided here from the caller's role, never from the query
-    // string: Admin sees the full trail; Manager/Director get the business view
-    // with System Admin's own actions hidden.
+    // string: Admin sees the full trail including raw request data;
+    // Manager/Director see every action except internet-scanner noise and
+    // System Admin's own actions.
     const isAdmin = req.user.roleid === ROLES.ADMIN;
     const result = await getAuditLog({
       page,
@@ -174,7 +175,8 @@ const getAuditLogHandler = async (req, res) => {
       from,
       to,
       hideAdminActors: !isAdmin,
-      businessOnly: !isAdmin,
+      hideBotTraffic: !isAdmin,
+      includeRequestData: isAdmin,
     });
     res.json(result);
   } catch (err) {
