@@ -64,7 +64,20 @@ const summariseChanges = (changes, max = 2) => {
   return shown.join("; ") + (extra > 0 ? ` (+${extra} more)` : "");
 };
 
-const OUTCOME_LABELS = { FAILURE: "Failed", DENIED: "Denied" };
+// A refused request is still logged under the action it *tried*, so without
+// this badge "PENDING USERS VIEWED" reads as if the data was seen.
+const OUTCOME_LABELS = {
+  FAILURE: { text: "Failed", title: "The request failed — nothing was changed" },
+  DENIED: { text: "Blocked", title: "The request was refused — no data was shown or changed" },
+};
+
+// Rows written before the label change say "Unauthenticated request".
+const actorDisplay = (entry) => {
+  if (entry.admin_id == null && (!entry.actor_name || entry.actor_name === "Unauthenticated request")) {
+    return "Not signed in";
+  }
+  return entry.actor_name || (entry.admin_id != null ? `User ${entry.admin_id}` : "—");
+};
 
 // `embedded` drops the report-page chrome (back button, subtitle) for callers
 // — like the Admin dashboard — that already provide their own frame. What the
@@ -325,16 +338,16 @@ function AuditLogReport({ embedded = false }) {
                               {entry.action_type.replaceAll("_", " ")}
                             </span>
                             {OUTCOME_LABELS[entry.outcome] && (
-                              <span className="alr-outcome-badge">
-                                {OUTCOME_LABELS[entry.outcome]}
+                              <span
+                                className="alr-outcome-badge"
+                                title={OUTCOME_LABELS[entry.outcome].title}
+                              >
+                                {OUTCOME_LABELS[entry.outcome].text}
                               </span>
                             )}
                           </td>
                           <td>{entry.entity_type ? entityLabel(entry.entity_type) : "—"}</td>
-                          <td>
-                            {entry.actor_name ||
-                              (entry.admin_id != null ? `User ${entry.admin_id}` : "—")}
-                          </td>
+                          <td>{actorDisplay(entry)}</td>
                           <td>{entry.target_name || entry.target_id || "—"}</td>
                           <td className={`alr-changes-cell ${hasZeroed ? "alr-zeroed" : ""}`}>
                             {changes
