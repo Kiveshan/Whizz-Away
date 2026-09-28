@@ -234,19 +234,41 @@ const COUNT_CAP = 20000;
 // actions), so the table is scanned for those too — but at most once every
 // FILTER_CACHE_MS, because DISTINCT over an audit table is a full scan.
 const FILTER_CACHE_MS = 15 * 60 * 1000;
-let filterCache = { expiresAt: 0, actionTypes: [], entityTypes: [] };
 
-const getAuditFilterValues = async () => {
-  if (Date.now() < filterCache.expiresAt) return filterCache;
+// Internet-scanner noise: anonymous requests to routes the app doesn't have
+// (/wp-login.php, /.env, …) that were rejected. New ones are no longer written
+// (see auditTrail.js); this hides the ones recorded before that — from the
+// rows and, because an unmapped route's entity is derived from its path
+// ("wp-login.php", "xmlrpc.php"), from the filter dropdowns too.
+const botTrafficSql = (alias = "") => {
+  const col = (name) => (alias ? `${alias}.${name}` : name);
+  return `(${col("action_type")} LIKE 'UNMAPPED\\_%' AND ${col("admin_id")} IS NULL
+           AND ${col("outcome")} IS DISTINCT FROM 'SUCCESS')`;
+};
 
+// One cache per view: the Manager/Director dropdowns are built without the
+// bot rows, Admin's with everything.
+const filterCaches = {
+  all: { expiresAt: 0, actionTypes: [], entityTypes: [] },
+  withoutBots: { expiresAt: 0, actionTypes: [], entityTypes: [] },
+};
+
+const getAuditFilterValues = async ({ excludeBots = false } = {}) => {
+  const cacheKey = excludeBots ? "withoutBots" : "all";
+  if (Date.now() < filterCaches[cacheKey].expiresAt) return filterCaches[cacheKey];
+
+  const botClause = excludeBots ? `AND NOT ${botTrafficSql()}` : "";
   let historicActions = [];
   let historicEntities = [];
   try {
     const [actions, entities] = await Promise.all([
-      pool.query(`SELECT DISTINCT action_type FROM audit_log ORDER BY action_type`),
+      pool.query(
+        `SELECT DISTINCT action_type FROM audit_log
+          WHERE TRUE ${botClause} ORDER BY action_type`
+      ),
       pool.query(
         `SELECT DISTINCT entity_type FROM audit_log
-          WHERE entity_type IS NOT NULL ORDER BY entity_type`
+          WHERE entity_type IS NOT NULL ${botClause} ORDER BY entity_type`
       ),
     ]);
     historicActions = actions.rows.map((r) => r.action_type);
@@ -260,7 +282,7 @@ const getAuditFilterValues = async () => {
   // AUDIT_LOG_VIEWED rows are excluded from every query (see getAuditLog), so
   // offering them — or their otherwise-unused "audit" entity — as filters
   // would just be dead options that always return nothing.
-  filterCache = {
+  filterCaches[cacheKey] = {
     expiresAt: Date.now() + FILTER_CACHE_MS,
     actionTypes: [...new Set([...AUDIT_ACTION_TYPES, ...historicActions])]
       .filter((type) => type !== "AUDIT_LOG_VIEWED")
@@ -269,7 +291,7 @@ const getAuditFilterValues = async () => {
       .filter((type) => type !== "audit")
       .sort(),
   };
-  return filterCache;
+  return filterCaches[cacheKey];
 };
 
 // Paginated, filterable read of the audit trail. Filters are all optional:
@@ -348,14 +370,9 @@ const getAuditLog = async ({
     conditions.push(`a.actor_role IS DISTINCT FROM $${params.length}`);
   }
 
-  // Internet-scanner noise: anonymous requests to routes the app doesn't have
-  // (/wp-login.php, /.env, …) that were rejected. New ones are no longer
-  // written (see auditTrail.js); this hides the ones recorded before that.
+  // Scanner noise — see botTrafficSql.
   if (hideBotTraffic) {
-    conditions.push(
-      `NOT (a.action_type LIKE 'UNMAPPED\\_%' AND a.admin_id IS NULL
-            AND a.outcome IS DISTINCT FROM 'SUCCESS')`
-    );
+    conditions.push(`NOT ${botTrafficSql("a")}`);
   }
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -418,7 +435,9 @@ const getAuditLog = async ({
 
   // Filter values come from the (cached) legacy scan plus the static registry —
   // see getAuditFilterValues.
-  const { actionTypes, entityTypes } = await getAuditFilterValues();
+  const { actionTypes, entityTypes } = await getAuditFilterValues({
+    excludeBots: hideBotTraffic,
+  });
 
   return {
     items: result.rows,
