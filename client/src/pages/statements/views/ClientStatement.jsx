@@ -71,6 +71,30 @@ const paymentDetailsOf = (statement) =>
     ["SWIFT Code", statement.swift_code],
   ].filter(([, value]) => value);
 
+// The brand mark for the PDF masthead, as a JPEG data URL. It is redrawn through
+// a canvas at a small size so the statement embeds a thumbnail, not the 1280px
+// original. Resolves null on failure: a missing logo should never block an
+// export, the masthead just lays out without it.
+const LOGO_SRC = "/images/whizz-away.jpeg";
+const LOGO_PX = 240;
+const loadLogo = () =>
+  new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = LOGO_PX;
+        canvas.height = LOGO_PX;
+        canvas.getContext("2d").drawImage(img, 0, 0, LOGO_PX, LOGO_PX);
+        resolve(canvas.toDataURL("image/jpeg", 0.9));
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = LOGO_SRC;
+  });
+
 const ClientStatement = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -282,8 +306,9 @@ const ClientStatement = () => {
   // Builds the PDF and RETURNS it rather than saving, so the caller can both
   // hand it to the user and upload it against the export snapshot. Laid out
   // like the statement screen: masthead, balance callout, the sum that produces
-  // it, age analysis, the ledger, then how to pay.
-  const buildPdf = () => {
+  // it, age analysis, the ledger, then how to pay. `logo` is a data URL from
+  // loadLogo(), or null to lay the masthead out without one.
+  const buildPdf = (logo) => {
     try {
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
@@ -369,11 +394,16 @@ const ClientStatement = () => {
 
       // ---- Masthead ---------------------------------------------------------
       let y = 20;
-      write(statement.company_name || "", M, y, { size: 17, style: "bold", color: C.deep });
+      const logoSize = 22;
+      const logoTop = 9;
+      if (logo) doc.addImage(logo, "JPEG", M, logoTop, logoSize, logoSize);
+      const nameX = logo ? M + logoSize + 5 : M;
+      write(statement.company_name || "", nameX, y, { size: 17, style: "bold", color: C.deep });
       let leftY = y + 5.5;
       companyLinesOf(statement).forEach((line) => {
-        leftY += write(line, M, leftY, { size: 8, color: C.muted, maxWidth: W * 0.6 });
+        leftY += write(line, nameX, leftY, { size: 8, color: C.muted, maxWidth: W * 0.6 - (nameX - M) });
       });
+      if (logo) leftY = Math.max(leftY, logoTop + logoSize + 2);
       label("Statement of account", pageW - M, y - 6, { size: 6.8, color: C.navy, align: "right" });
       write(periodLabel, pageW - M, y + 0.5, { size: 13, style: "bold", color: C.deep, align: "right" });
       write(`Statement date ${statementDate}`, pageW - M, y + 5.5, { size: 8, color: C.muted, align: "right" });
@@ -522,6 +552,9 @@ const ClientStatement = () => {
         foot: [[{ content: "Balance due", colSpan: 6 }, formatRand(balanceDue)]],
         showFoot: "lastPage",
         showHead: "everyPage",
+        // A wrapped Details cell must not split across pages: the tail lands
+        // on the next page as an orphan line with no date, amount or type.
+        rowPageBreak: "avoid",
         theme: "plain",
         margin: { left: M, right: M, top: 24, bottom: 18 },
         styles: {
@@ -959,7 +992,7 @@ const ClientStatement = () => {
       }
 
       const { blob, filename } =
-        format === "PDF" ? buildPdf() : await buildExcel();
+        format === "PDF" ? buildPdf(await loadLogo()) : await buildExcel();
 
       saveBlob(blob, filename);
 
