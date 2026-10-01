@@ -15,6 +15,18 @@ import {
   formatRand,
 } from "../services/statementExportService.js";
 
+// "Statement-Acme-Logistics-2026-08.pdf" — named by client and covered month,
+// mirroring the subcontractor exports. The derived statement key is an internal
+// handle, so it never appears in anything the client sees.
+const buildFilename = (statement, extension) =>
+  [
+    "Statement",
+    String(statement?.client?.name || "").trim().replace(/\s+/g, "-"),
+    String(statement?.period || "").slice(0, 7),
+  ]
+    .filter(Boolean)
+    .join("-") + `.${extension}`;
+
 // The last day of the month a statement covers. generation_date is the 1st of
 // the FOLLOWING month, so dating the Payments/Insurance rows by it put them
 // outside the statement's own period (01/08 on a July statement).
@@ -628,7 +640,7 @@ const ClientStatement = () => {
 
       return {
         blob: doc.output("blob"),
-        filename: `Statement-${statement.statement_key}.pdf`,
+        filename: buildFilename(statement, "pdf"),
       };
     } catch (err) {
       console.error("PDF generation error:", err);
@@ -910,7 +922,7 @@ const ClientStatement = () => {
       blob: new Blob([buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       }),
-      filename: `Statement-${statement.statement_key}.xlsx`,
+      filename: buildFilename(statement, "xlsx"),
     };
   };
 
@@ -1147,7 +1159,9 @@ const ClientStatement = () => {
                 <option value={100000}>All rows</option>
               </select>
               <span className="cs-range">
-                {filteredTransactions.length === 0
+                {uiTransactions.length === 0
+                  ? "No transactions this month — opening and closing balances only"
+                  : filteredTransactions.length === 0
                   ? "No transactions match this search"
                   : `Showing ${txStart + 1}–${Math.min(
                       txStart + txPerPage,
