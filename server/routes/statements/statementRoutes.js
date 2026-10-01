@@ -1,41 +1,58 @@
 import express from "express";
-import { verifyToken, verifyAdminAccess } from "../../middleware/auth.js";
+import { verifyClientStatementAccess } from "../../middleware/auth.js";
+import { uploadStatementDocument } from "../../utils/s3-config.js";
 import {
   getClientStatementsHandler,
   getStatementDetailsHandler,
-  generateStatementsHandler,
-  regenerateStatementHandler,
-  authenticateScheduledJob, // Add this import
 } from "../../controllers/statements/statementController.js";
+import {
+  createStatementExportHandler,
+  attachStatementExportDocumentHandler,
+  listStatementExportsHandler,
+  getStatementExportHandler,
+} from "../../controllers/statements/statementExportController.js";
 
+// Mounted below the global verifyToken guard (routes/index.js), so every route
+// here is authenticated already. Client statements are derived on demand, so
+// there is no generate/regenerate endpoint any more.
 const router = express.Router();
 
-// Existing routes (keep these)
-router.get(
-  "/api/statements/:clientId",
-  verifyToken,
-  getClientStatementsHandler
-);
-router.get(
-  "/api/statement/:statementId",
-  verifyToken,
-  getStatementDetailsHandler
+router.get("/api/statements/:clientId", getClientStatementsHandler);
+router.get("/api/statement/:statementId", getStatementDetailsHandler);
+
+// --- Statement export snapshots -------------------------------------------
+// The extra role check narrows these to the roles that own the debtors section
+// (routeRoles.js: 3,1,4).
+//
+// Two-step by design: the export route derives and freezes the figures
+// server-side, then the client uploads the document it rendered from them.
+//
+// The listing routes deliberately live under /api/statement-exports rather than
+// /api/statements/... — the existing GET /api/statements/:clientId would
+// otherwise swallow them, matching "exports" as a client id.
+router.post(
+  "/api/statements/:statementId/export",
+  verifyClientStatementAccess,
+  createStatementExportHandler
 );
 
-// Update this route to use authenticateScheduledJob instead of verifyToken
 router.post(
-  "/api/statements/generate",
-  authenticateScheduledJob,
-  generateStatementsHandler
+  "/api/statement-exports/:exportId/document",
+  verifyClientStatementAccess,
+  uploadStatementDocument.single("document"),
+  attachStatementExportDocumentHandler
 );
 
-// Admin-only: regenerate a statement for a specific past month, to correct
-// aging snapshots that have drifted from live invoice/add-on data.
-router.post(
-  "/api/statements/regenerate",
-  verifyToken,
-  verifyAdminAccess,
-  regenerateStatementHandler
+router.get(
+  "/api/statement-exports",
+  verifyClientStatementAccess,
+  listStatementExportsHandler
+);
+
+router.get(
+  "/api/statement-exports/:exportId",
+  verifyClientStatementAccess,
+  getStatementExportHandler
 );
 
 export default router;

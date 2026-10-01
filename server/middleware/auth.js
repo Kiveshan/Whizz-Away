@@ -187,8 +187,33 @@ const verifySubcontractorStatementAccess = (req, res, next) => {
   return next()
 }
 
+// Client statement exports: producing or reading a frozen statement document is
+// a debtors function, so this mirrors the client-side gate on /statements-list
+// and /client-statement in client/src/config/routeRoles.js (roles 3, 1, 4).
+const verifyClientStatementAccess = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      error: "Authentication required",
+      message: "You must be logged in to access this resource",
+      code: "NO_USER",
+    })
+  }
+
+  const allowedRoles = [ROLES.DEBTORS_CLERK, ROLES.MANAGER, ROLES.DIRECTOR]
+  if (!allowedRoles.includes(req.user.roleid)) {
+    return res.status(403).json({
+      error: "Unauthorized",
+      message: "You do not have permission to access this resource",
+      code: "INSUFFICIENT_PERMISSIONS",
+    })
+  }
+
+  return next()
+}
+
 export {
   verifyToken,
+  verifyClientStatementAccess,
   verifyAdminAccess,
   verifyDriverRateAuditAccess,
   verifyAuditLogAccess,
