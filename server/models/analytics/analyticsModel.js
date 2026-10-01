@@ -933,6 +933,159 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
   return data
 }
 
+// Truck Income vs Truck Expenses (per truck)
+//
+// Income per truck = the same per-leg turnover allocation used by
+// getTurnoverPerTruck (add-on instructions fall back to the linked add-on amount).
+//
+// Expense per truck has two sources that are deliberately kept from
+// double-counting each other:
+//   * Fuel comes from expenses_with_po_v (type = 'fuel', expensecost) exactly as
+//     the Fuel-per-Truck / Diesel charts read it, keyed on expenses_m2.truckid.
+//   * Everything else (parts, repairs, tyres, towing, etc.) comes from
+//     purchase_orders, EXCLUDING the fuel expense type (5) because those fuel POs
+//     are the same money already captured above via expenses_m2.
+//
+// Non-fuel purchase_orders carry no truckid in the data — only a free-text
+// reg_no — so they are matched to a truck by a normalised registration key
+// (upper-cased, stripped of everything but A-Z/0-9). Rows that match no active
+// in-house truck (blank regs, "workshop", trailers, sub/inactive trucks) collect
+// under a single "Unassigned / Workshop" row so no spend is silently dropped.
+// When a specific truck is selected that bucket is excluded.
+const getTruckIncomeVsExpense = async (client, month, year, truckId = null) => {
+  const params = [month, year]
+  const incomeTruckFilter = truckId ? "AND t.m5truckskey = $3" : ""
+  const fuelTruckFilter = truckId ? "AND t.m5truckskey = $3" : ""
+  const otherTruckFilter = truckId ? "AND tk.m5truckskey = $3" : ""
+  if (truckId) params.push(truckId)
+
+  const query = `
+    WITH DeduplicatedLegs AS (
+      SELECT DISTINCT m1key, legnumber, truckregnumber
+      FROM legs_m2
+    ),
+    DistinctLegs AS (
+      SELECT m1key, COUNT(DISTINCT legnumber) AS num_legs
+      FROM DeduplicatedLegs
+      GROUP BY m1key
+    ),
+    TruckCountsPerLeg AS (
+      SELECT m1key, legnumber, COUNT(DISTINCT truckregnumber) AS trucks_per_leg
+      FROM DeduplicatedLegs
+      GROUP BY m1key, legnumber
+    ),
+    IncomePerTruck AS (
+      SELECT
+        l.truckregnumber,
+        SUM(
+          (CASE WHEN m.shipment_type = 5 THEN COALESCE(ao.amount, 0) ELSE m.total_cost END)
+          / dl.num_legs / tcpl.trucks_per_leg
+        ) AS total_income
+      FROM DeduplicatedLegs l
+      JOIN m1_controller m ON l.m1key = m.m1key
+      LEFT JOIN add_ons ao ON m.addon_id = ao.addon_id
+      JOIN DistinctLegs dl ON l.m1key = dl.m1key
+      JOIN TruckCountsPerLeg tcpl ON l.m1key = tcpl.m1key AND l.legnumber = tcpl.legnumber
+      JOIN m5_trucks t ON l.truckregnumber = t.truckregnum
+      WHERE t.is_subcontractor = false
+        AND t.status = true
+        AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
+        AND EXTRACT(YEAR FROM m.created_at)::TEXT = $2
+        ${incomeTruckFilter}
+      GROUP BY l.truckregnumber
+    ),
+    FuelPerTruck AS (
+      SELECT
+        t.truckregnum AS truckregnumber,
+        COALESCE(SUM(e.expensecost), 0) AS fuel_cost
+      FROM expenses_with_po_v e
+      JOIN m5_trucks t ON e.truckid = t.m5truckskey
+      WHERE e.type = 'fuel'
+        AND t.is_subcontractor = false
+        AND t.status = true
+        AND TRIM(to_char(e.expense_date, 'Month')) = $1
+        AND EXTRACT(YEAR FROM e.expense_date)::TEXT = $2
+        ${fuelTruckFilter}
+      GROUP BY t.truckregnum
+    ),
+    TruckKeys AS (
+      SELECT
+        m5truckskey,
+        truckregnum,
+        regexp_replace(upper(truckregnum), '[^A-Z0-9]', '', 'g') AS norm
+      FROM m5_trucks
+      WHERE is_subcontractor = false AND status = true
+    ),
+    OtherPerTruck AS (
+      SELECT
+        COALESCE(tk.truckregnum, 'Unassigned / Workshop') AS truckregnumber,
+        COALESCE(SUM(po.total), 0) AS other_cost
+      FROM purchase_orders po
+      LEFT JOIN TruckKeys tk
+        ON tk.norm <> ''
+        AND regexp_replace(upper(COALESCE(po.reg_no, '')), '[^A-Z0-9]', '', 'g') = tk.norm
+      WHERE COALESCE(po.expense_type_id, 0) <> 5
+        AND TRIM(to_char(po.date, 'Month')) = $1
+        AND EXTRACT(YEAR FROM po.date)::TEXT = $2
+        ${otherTruckFilter}
+      GROUP BY COALESCE(tk.truckregnum, 'Unassigned / Workshop')
+    )
+    SELECT
+      COALESCE(i.truckregnumber, f.truckregnumber, o.truckregnumber) AS truckregnumber,
+      COALESCE(i.total_income, 0) AS total_income,
+      COALESCE(f.fuel_cost, 0) AS fuel_cost,
+      COALESCE(o.other_cost, 0) AS other_cost,
+      COALESCE(f.fuel_cost, 0) + COALESCE(o.other_cost, 0) AS total_expense
+    FROM IncomePerTruck i
+    FULL OUTER JOIN FuelPerTruck f ON i.truckregnumber = f.truckregnumber
+    FULL OUTER JOIN OtherPerTruck o
+      ON COALESCE(i.truckregnumber, f.truckregnumber) = o.truckregnumber
+    ORDER BY total_income DESC, total_expense DESC
+  `
+
+  const result = await client.query(query, params)
+  console.log("Truck income vs expense query result:", result.rows)
+  console.log(`Query returned ${result.rows.length} rows`)
+
+  if (!result.rows || result.rows.length === 0) {
+    console.log(`No rows returned for ${month} ${year}. Check query or data.`)
+    return []
+  }
+
+  const totalIncome = result.rows.reduce(
+    (sum, row) => sum + Number.parseFloat(row.total_income || 0),
+    0
+  )
+  const totalExpense = result.rows.reduce(
+    (sum, row) => sum + Number.parseFloat(row.total_expense || 0),
+    0
+  )
+
+  const data = result.rows.map((row) => {
+    const income = Number.parseFloat(row.total_income || 0)
+    const fuelCost = Number.parseFloat(row.fuel_cost || 0)
+    const otherCost = Number.parseFloat(row.other_cost || 0)
+    const expense = Number.parseFloat(row.total_expense || 0)
+    const incomePercentage = totalIncome > 0 ? ((income / totalIncome) * 100).toFixed(2) : 0
+    const expensePercentage = totalExpense > 0 ? ((expense / totalExpense) * 100).toFixed(2) : 0
+    return {
+      truckregnumber: row.truckregnumber,
+      total_income: income,
+      fuel_cost: fuelCost,
+      other_cost: otherCost,
+      total_expense: expense,
+      profit: Number((income - expense).toFixed(2)),
+      incomePercentage: Number.parseFloat(incomePercentage),
+      expensePercentage: Number.parseFloat(expensePercentage),
+      month_name: month.trim(),
+      year: year.toString(),
+    }
+  })
+
+  console.log("Processed truck income vs expense data:", data)
+  return data
+}
+
 const getAllExpenses = async (client, month, year) => {
   const fuelQuery = `
     SELECT 
@@ -1507,6 +1660,7 @@ export {
   getWagesVsExpenses,
   getTurnoverVsSubbieExpense,
   getTurnoverVsFuelPerTruck,
+  getTruckIncomeVsExpense,
   getPaymentsReceivedPerMonth,
   getPaymentClients,
   getClientSubbieCommissionReport,
