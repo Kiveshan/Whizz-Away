@@ -6,6 +6,29 @@ import "../css/StatementList.css";
 import api from "../../../api"; // Import the axios instance
 import Pagination from "..//../../components/Pagination"; // Import the Pagination component
 
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+// Statements are identified by the month they cover, not by a number — the
+// derived key ("<clientId>-YYYY-MM") is an internal handle, never shown.
+const formatPeriodLabel = (period) => {
+  if (!period) return "";
+  const [year, month] = String(period).split("-").map(Number);
+  return `${MONTH_NAMES[month - 1] || ""} ${year}`.trim();
+};
+
 const StatementList = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -102,20 +125,7 @@ const StatementList = () => {
   };
 
 
-  const monthNames = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-  ];
+  const monthNames = MONTH_NAMES;
 
   const minYear = 2025;
   const maxYear = currentYear + 2;
@@ -130,12 +140,6 @@ const StatementList = () => {
   const endIndex = startIndex + recordsPerPage;
   const currentStatements = statements.slice(startIndex, endIndex);
 
-  const getDisplayDate = (dateString) => {
-    if (!dateString) return "";
-    const d = new Date(dateString);
-    d.setDate(d.getDate() - 1);
-    return d.toLocaleDateString();
-  };
 
   if (loading)
     return (
@@ -201,23 +205,19 @@ const StatementList = () => {
       <table className="instruction-table1">
         <thead>
           <tr>
-            <th>Statement No</th>
-            <th>Date</th>
+            <th>Month/Year</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {currentStatements.length === 0 ? (
             <tr>
-              <td colSpan="3">No statements found for this client.</td>
+              <td colSpan="2">No statements found for this client.</td>
             </tr>
           ) : (
             currentStatements.map((statement) => (
               <tr key={statement.statement_key}>
-                <td>{statement.statement_key}</td>
-                <td>
-                  {getDisplayDate(statement.generation_date)}
-                </td>
+                <td>{formatPeriodLabel(statement.period)}</td>
                 <td>
                   <button
                     className="view-btn"

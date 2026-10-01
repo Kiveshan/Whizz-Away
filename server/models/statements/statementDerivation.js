@@ -240,58 +240,105 @@ const outstandingAsAt = async (db, clientId, asAt) => {
   return ageOpenItems(items.rows, credits.rows[0]?.credit);
 };
 
+/** Every month in which this client invoiced, paid, or was credited. */
+const ACTIVITY_MONTHS = `
+  SELECT DISTINCT to_char(date_trunc('month', d)::date, 'YYYY-MM-DD') AS period
+  FROM (
+    SELECT i.date AS d FROM invoice i WHERE i.clientid = $1
+    UNION ALL
+    SELECT a.date FROM add_ons a WHERE a.client_id = $1
+    UNION ALL
+    SELECT (item->>'line_date')::date
+      FROM payment_m3 p CROSS JOIN LATERAL jsonb_array_elements(p.line_items) AS item
+      WHERE p.clientid = $1
+    UNION ALL
+    SELECT cn.creditnote_date FROM credit_notes cn WHERE cn.client_id = $1
+  ) AS activity
+  WHERE d IS NOT NULL
+  ORDER BY 1
+`;
+
+/** The first of the current month, in UTC, as YYYY-MM-01. */
+const currentMonth = () => `${new Date().toISOString().slice(0, 7)}-01`;
+
+/** Inclusive run of month-firsts from one period to another. */
+const monthsBetween = (from, to) => {
+  const out = [];
+  let [year, month] = from.split("-").map(Number);
+  while (`${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-01` <= to) {
+    out.push(`${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-01`);
+    if (++month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+  return out;
+};
+
 /**
- * Every month this client has activity in, newest first. Replaces the list of
- * rows the generator used to create — a statement exists for any month with an
- * invoice, add-on, payment or credit note.
+ * Every month this client has a statement for, newest first.
+ *
+ * A month qualifies if it had activity (an invoice, add-on, payment or credit
+ * note) OR it closed with money still owed. The second case is why the series
+ * is built month by month rather than taken straight from the ledgers: a client
+ * who paid nothing and bought nothing in a month still has a statement, because
+ * everything outstanding aged by that month — 60 days becomes 90 — and that
+ * movement is the whole point of sending one. The run extends to the current
+ * month for the same reason, so the month just ended is always there to open,
+ * export and send.
+ *
+ * A month with no activity and nothing owed is skipped: there is genuinely
+ * nothing to say, and a dormant client should not accumulate empty statements.
  */
 const listStatementPeriods = async (clientId, { year = null, month = null } = {}) => {
   const client = await pool.connect();
   try {
-    const { rows } = await client.query(
-      `
-      SELECT to_char(period, 'YYYY-MM-DD') AS period
-      FROM (
-        SELECT DISTINCT date_trunc('month', d)::date AS period FROM (
-          SELECT i.date AS d FROM invoice i WHERE i.clientid = $1
-          UNION ALL
-          SELECT a.date FROM add_ons a WHERE a.client_id = $1
-          UNION ALL
-          SELECT (item->>'line_date')::date
-            FROM payment_m3 p CROSS JOIN LATERAL jsonb_array_elements(p.line_items) AS item
-            WHERE p.clientid = $1
-          UNION ALL
-          SELECT cn.creditnote_date FROM credit_notes cn WHERE cn.client_id = $1
-        ) AS activity
-        WHERE d IS NOT NULL
-      ) AS months
-      WHERE ($2::int IS NULL OR EXTRACT(YEAR  FROM period) = $2::int)
-        AND ($3::int IS NULL OR EXTRACT(MONTH FROM period) = $3::int)
-      ORDER BY period DESC
-      `,
-      [
-        clientId,
-        year ? Number.parseInt(year, 10) : null,
-        month ? Number.parseInt(month, 10) : null,
-      ]
-    );
+    const { rows } = await client.query(ACTIVITY_MONTHS, [clientId]);
+    if (rows.length === 0) return [];
 
-    return rows.map((row) => ({
-      statement_key: buildStatementKey(clientId, row.period),
-      clientid: clientId,
-      period: row.period,
-      // Kept for the pages that still label a statement by its generation date:
-      // the 1st of the month AFTER the covered one, as the old table stored.
-      generation_date: new Date(
-        Date.UTC(
-          Number(row.period.slice(0, 4)),
-          Number(row.period.slice(5, 7)),
-          1
+    const activity = new Set(rows.map((row) => row.period));
+    const first = rows[0].period;
+    const last = rows[rows.length - 1].period;
+    const series = monthsBetween(first, last > currentMonth() ? last : currentMonth());
+
+    const periods = [];
+    // Every ledger that moves the balance also makes a month an activity month,
+    // so across a run of quiet months the balance cannot change — only its
+    // aging does. One balance query per run of quiet months, not per month.
+    let quietRunOwes = null;
+    for (const period of series) {
+      if (activity.has(period)) {
+        quietRunOwes = null;
+      } else {
+        if (quietRunOwes === null) {
+          const { total } = await outstandingAsAt(client, clientId, lastDayOf(period));
+          quietRunOwes = Math.abs(total) >= 0.005;
+        }
+        if (!quietRunOwes) continue;
+      }
+      periods.push(period);
+    }
+
+    return periods
+      .filter((period) => {
+        if (year && Number(period.slice(0, 4)) !== Number.parseInt(year, 10)) return false;
+        if (month && Number(period.slice(5, 7)) !== Number.parseInt(month, 10)) return false;
+        return true;
+      })
+      .reverse()
+      .map((period) => ({
+        statement_key: buildStatementKey(clientId, period),
+        clientid: clientId,
+        period,
+        // Kept for the pages that still label a statement by its generation
+        // date: the 1st of the month AFTER the covered one, as the old table
+        // stored.
+        generation_date: new Date(
+          Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5, 7)), 1)
         )
-      )
-        .toISOString()
-        .slice(0, 10),
-    }));
+          .toISOString()
+          .slice(0, 10),
+      }));
   } finally {
     client.release();
   }
