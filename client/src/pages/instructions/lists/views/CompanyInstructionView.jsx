@@ -1,13 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import "../../css/CompanyInstructionView.css"
 import api from "../../../../api"
 import Pagination from "../../../../components/Pagination"
+import { useInstructionSearch } from "../../../../hooks/useInstructionSearch"
+import InstructionSearchResults from "../components/InstructionSearchResults"
 
 const CompanyInstructionView = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -16,10 +19,16 @@ const CompanyInstructionView = () => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [recordsPerPage] = useState(10)
-  const [containerSearch, setContainerSearch] = useState("")
-  const [debouncedSearch, setDebouncedSearch] = useState("")
-  const [containerSearchLoading, setContainerSearchLoading] = useState(false)
-  const [searchMatchingClientIds, setSearchMatchingClientIds] = useState(null)
+  // Seeded from history state so Back from an opened search result restores the search.
+  const {
+    query: containerSearch,
+    setQuery: setContainerSearch,
+    isSearching,
+    results: searchResults,
+    loading: searchLoading,
+    error: searchError,
+    retry: retrySearch,
+  } = useInstructionSearch(location.state?.containerSearch || "")
 
   useEffect(() => {
     const fetchClientStats = async () => {
@@ -56,46 +65,7 @@ const CompanyInstructionView = () => {
     fetchClientStats()
   }, [])
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(containerSearch), 400)
-    return () => clearTimeout(timer)
-  }, [containerSearch])
-
-  useEffect(() => {
-    if (!debouncedSearch.trim()) {
-      setSearchMatchingClientIds(null)
-      setContainerSearchLoading(false)
-      return
-    }
-
-    const runSearch = async () => {
-      try {
-        setContainerSearchLoading(true)
-        const response = await api.get(`/api/instructions/search?q=${encodeURIComponent(debouncedSearch.trim())}`)
-        const instructions = response.data || []
-        const clientIds = new Set(
-          instructions
-            .flatMap((i) => [i.client, i.clientid, i.m5clientkey, i.client_id, i.client_key, i.clientId])
-            .filter(Boolean)
-            .map((id) => String(id).trim()),
-        )
-        setSearchMatchingClientIds(clientIds)
-      } catch (err) {
-        console.error("Error running instruction search", err)
-      } finally {
-        setContainerSearchLoading(false)
-      }
-    }
-
-    runSearch()
-  }, [debouncedSearch])
-
-  const getFilteredClients = () => {
-    if (!debouncedSearch.trim() || searchMatchingClientIds === null) return clients
-    return clients.filter((client) => searchMatchingClientIds.has(String(client.m5clientkey).trim()))
-  }
-
-  const filteredClients = getFilteredClients()
+  const filteredClients = clients
 
   // Calculate pagination
   const indexOfLastRecord = currentPage * recordsPerPage
@@ -107,9 +77,6 @@ const CompanyInstructionView = () => {
     setCurrentPage(pageNumber)
   }
 
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [debouncedSearch])
 
   // Style for centered cells
   const centeredCellStyle = {
@@ -258,6 +225,25 @@ const CompanyInstructionView = () => {
     borderCollapse: "collapse",
   }
 
+  // Store the search on this page's history entry first, so Back from the opened page
+  // comes back to the same results rather than an empty search box.
+  const rememberSearch = () =>
+    navigate(location.pathname, { replace: true, state: { ...location.state, containerSearch } })
+
+  const handleOpenSearchResult = (result) => {
+    rememberSearch()
+    navigate("/Viewcontrollerinstructions", {
+      state: { instructionId: result.m1key, clientId: result.client, clientName: result.companyname },
+    })
+  }
+
+  const handleOpenSearchResultClient = (result) => {
+    rememberSearch()
+    navigate("/CompanyInstructions", {
+      state: { clientId: result.client, clientName: result.companyname, containerSearch: containerSearch.trim() },
+    })
+  }
+
   return (
     <div className="" style={{ textAlign: "center" }}>
       {/* Back Button */}
@@ -274,7 +260,7 @@ const CompanyInstructionView = () => {
         <input
           type="text"
           className="company-instruction-view-search-input"
-          placeholder="Search by container number or client ref"
+          placeholder="Search by container, client ref, booking ref, KSM ref or instruction #"
           value={containerSearch}
           onChange={(e) => setContainerSearch(e.target.value)}
         />
@@ -286,6 +272,18 @@ const CompanyInstructionView = () => {
           <p>Loading client data...</p>
         ) : error ? (
           <p className="error-message">{error}</p>
+        ) : isSearching ? (
+          <div style={{ width: "100%", maxWidth: "1200px" }}>
+            <InstructionSearchResults
+              results={searchResults}
+              loading={searchLoading}
+              error={searchError}
+              onRetry={retrySearch}
+              onOpenInstruction={handleOpenSearchResult}
+              onOpenClient={handleOpenSearchResultClient}
+              paginationClassName="company-instruction-view-pagination-container"
+            />
+          </div>
         ) : (
           <>
             <table style={tableStyle}>
@@ -317,16 +315,10 @@ const CompanyInstructionView = () => {
                 </tr>
               </thead>
               <tbody>
-                {containerSearchLoading ? (
+                {currentClients.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="text-center p-3">
-                      Searching...
-                    </td>
-                  </tr>
-                ) : currentClients.length === 0 ? (
-                  <tr>
-                    <td colSpan="7" className="text-center p-3">
-                      {containerSearch.trim() ? "No clients found for that container number or client ref" : "No client data available"}
+                      "No client data available"
                     </td>
                   </tr>
                 ) : (
@@ -370,7 +362,7 @@ const CompanyInstructionView = () => {
       </div>
 
       {/* Pagination */}
-      {!loading && !error && filteredClients.length > 0 && (
+      {!loading && !error && !isSearching && filteredClients.length > 0 && (
         <div className="company-instruction-view-pagination-container">
           <Pagination
             totalRecords={filteredClients.length}
