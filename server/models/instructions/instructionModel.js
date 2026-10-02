@@ -1080,32 +1080,61 @@ export const getInstructions = async (clientId) => {
   }
 };
 
-// Searchable fields for the instruction search endpoint.
-// Each entry is a SQL expression. Add new entries here to extend search coverage.
+// Searchable instruction columns for the instruction search endpoint: `label` is what the
+// UI shows as "matched on". Matching is a case-insensitive substring match that ignores
+// spaces and dashes on both sides ("SEP92" finds "SEP 92"). Add entries here to extend
+// search coverage. Container numbers (a child table) and the instruction key (exact
+// match) are handled separately in searchInstructions.
 const INSTRUCTION_SEARCH_FIELDS = [
-  `cont.containernum`,
-  `m."clientFileRef"`,
+  { label: "Client ref", column: `m."clientFileRef"` },
+  { label: "Booking ref", column: `m.booking_ref` },
+  { label: "KSM file ref", column: `m."ksmFileRef"` },
 ]
 
-export const searchInstructions = async ({ q, clientId } = {}) => {
-  const queryParams = []
-  const conditions = []
+const stripSeparatorsSql = (column) => `regexp_replace(${column}, '[[:space:]-]', '', 'g')`
 
-  if (q && q.trim()) {
-    queryParams.push(`%${q.trim()}%`)
-    const idx = queryParams.length
-    conditions.push(`(${INSTRUCTION_SEARCH_FIELDS.map((f) => `${f} ILIKE $${idx}`).join(" OR ")})`)
+export const searchInstructions = async ({ q, clientId } = {}) => {
+  const term = (q || "").trim()
+  // Strip separators like the SQL side does, then escape LIKE wildcards so "%" and "_"
+  // in a ref match literally instead of matching anything.
+  const normalized = term.replace(/[\s-]/g, "")
+  if (!normalized) return []
+
+  const queryParams = [`%${normalized.replace(/[\\%_]/g, "\\$&")}%`]
+  const pattern = "$1"
+
+  const fieldMatches = INSTRUCTION_SEARCH_FIELDS.map(({ label, column }) => ({
+    label,
+    sql: `${stripSeparatorsSql(column)} ILIKE ${pattern}`,
+  }))
+
+  const containerMatchSql = `
+    FROM public.container cn
+    WHERE cn.m1key = m.m1key AND ${stripSeparatorsSql("cn.containernum")} ILIKE ${pattern}`
+  fieldMatches.push({ label: "Container", sql: `EXISTS (SELECT 1 ${containerMatchSql})` })
+
+  // Instruction key is matched exactly (a substring match on "12" would hit 112, 1200, ...).
+  // Compared as text so an over-long digit string can't overflow the integer cast.
+  if (/^\d+$/.test(normalized)) {
+    queryParams.push(normalized.replace(/^0+(?=\d)/, ""))
+    fieldMatches.push({ label: "Instruction #", sql: `m.m1key::text = $${queryParams.length}` })
   }
+
+  const conditions = [`(${fieldMatches.map((f) => f.sql).join(" OR ")})`]
 
   if (clientId) {
     queryParams.push(clientId)
     conditions.push(`m.client = $${queryParams.length}`)
   }
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
+  const matchedFieldsSql = `array_remove(ARRAY[${fieldMatches
+    .map((f) => `CASE WHEN ${f.sql} THEN '${f.label}' END`)
+    .join(", ")}], NULL)`
 
   const sql = `
     SELECT DISTINCT ON (m.m1key)
+      ${matchedFieldsSql} AS matched_fields,
+      (SELECT string_agg(DISTINCT cn.containernum, ', ') ${containerMatchSql}) AS matched_containers,
       m.m1key,
       m."clientFileRef" AS fileno,
       m."clientFileRef" AS client_ref,
@@ -1133,9 +1162,8 @@ export const searchInstructions = async ({ q, clientId } = {}) => {
     JOIN public.m5_client c ON m.client = c.m5clientkey
     LEFT JOIN public.shipment s ON m.shipment_type = s.shipkey
     LEFT JOIN public.invoice i ON m.m1key = i.m1key
-    LEFT JOIN public.container cont ON cont.m1key = m.m1key
-    ${whereClause}
-    ORDER BY m.m1key, m.created_at DESC
+    WHERE ${conditions.join(" AND ")}
+    ORDER BY m.m1key DESC
   `
 
   try {
