@@ -1,4 +1,9 @@
 import { pool } from "../../config/database.js"
+import {
+  agingForAllClients,
+  outstandingAsAt,
+  dayBefore,
+} from "../statements/statementDerivation.js"
 
 // Define monthNames for numeric-to-name conversion
 const monthNames = {
@@ -326,70 +331,74 @@ const getAllTrucks = async (client) => {
   }))
 }
 
-const getAgingAnalysis = async (client, month, year, clientId = null) => {
-  const params = [month, year]
-  let query = `
-    SELECT 
-      ${clientId ? "c.client" : "'Total Aging' as client"}, 
-      SUM(a.current) as current_amount,
-      SUM(a."30days") as thirty_days,
-      SUM(a."60days") as sixty_days,
-      SUM(a."90days") as ninety_days,
-      to_char(s.generation_date, 'Month') as month_name,
-      EXTRACT(YEAR FROM s.generation_date) as year
-    FROM aging_analysis a
-    JOIN statements s ON a.aging_key = s.agingid
-    JOIN m5_client c ON a.clientid = c.m5clientkey
-    WHERE TRIM(to_char(s.generation_date, 'Month')) = $1
-    AND EXTRACT(YEAR FROM s.generation_date)::text = $2
-  `
-  if (clientId) {
-    query += ` AND a.clientid = $3`
-    params.push(clientId)
+// Aging comes from the same derivation as client statements
+// (models/statements/statementDerivation.js), so these reports and the
+// statement pages cannot disagree.
+//
+// The selected month keeps the meaning the old statement-table query gave it:
+// statements were dated the 1st of the month AFTER the one they covered, so
+// "September" is the position at the close of August. A month that has not
+// started yet returns nothing, as it did when no statement row existed for it.
+const agingAsAtForMonth = (month, year) => {
+  const index = Object.values(monthNames).indexOf(String(month || "").trim())
+  if (index < 0 || !/^\d{4}$/.test(String(year || "").trim())) {
+    throw new Error(`Invalid month/year "${month} ${year}"`)
   }
-  query += `
-    GROUP BY ${clientId ? "c.client," : ""} to_char(s.generation_date, 'Month'), EXTRACT(YEAR FROM s.generation_date)
-  `
-  const result = await client.query(query, params)
-  console.log("Raw query result:", result.rows)
-  console.log(`Query returned ${result.rows.length} rows`)
+  const firstOfMonth = `${String(year).trim()}-${String(index + 1).padStart(2, "0")}-01`
+  if (firstOfMonth > new Date().toISOString().slice(0, 10)) return null
+  return dayBefore(firstOfMonth)
+}
 
-  return result.rows.map((row) => ({
-    client: row.client,
-    current: Number.parseFloat(row.current_amount) || 0,
-    thirtyDays: Number.parseFloat(row.thirty_days) || 0,
-    sixtyDays: Number.parseFloat(row.sixty_days) || 0,
-    ninetyDays: Number.parseFloat(row.ninety_days) || 0,
-    month: row.month_name.trim(),
-    year: row.year.toString(),
-  }))
+const ZERO_AGING = { current: 0, "30days": 0, "60days": 0, "90days": 0 }
+
+const toAgingRow = (buckets) => ({
+  current: buckets.current,
+  thirtyDays: buckets["30days"],
+  sixtyDays: buckets["60days"],
+  ninetyDays: buckets["90days"],
+})
+
+const getAgingAnalysis = async (client, month, year, clientId = null) => {
+  const asAt = agingAsAtForMonth(month, year)
+  if (!asAt) return []
+  const period = { month: String(month).trim(), year: String(year).trim() }
+
+  if (clientId) {
+    const { rows } = await client.query(
+      "SELECT client FROM m5_client WHERE m5clientkey = $1",
+      [clientId]
+    )
+    if (rows.length === 0) return []
+    const { buckets } = await outstandingAsAt(client, Number(clientId), asAt)
+    return [{ client: rows[0].client, ...toAgingRow(buckets), ...period }]
+  }
+
+  // Summed in cents so the total is exact.
+  const cents = { current: 0, "30days": 0, "60days": 0, "90days": 0 }
+  for (const { buckets } of (await agingForAllClients(client, asAt)).values()) {
+    for (const bucket of Object.keys(cents)) {
+      cents[bucket] += Math.round(buckets[bucket] * 100)
+    }
+  }
+  const totals = Object.fromEntries(
+    Object.entries(cents).map(([bucket, value]) => [bucket, value / 100])
+  )
+  return [{ client: "Total Aging", ...toAgingRow(totals), ...period }]
 }
 
 const getDebtorAgeAnalysisPerClient = async (client, month, year) => {
-  const query = `
-    SELECT
-      c.m5clientkey  AS client_id,
-      c.client       AS client_name,
-      SUM(a.current)    AS current_amount,
-      SUM(a."30days")   AS thirty_days,
-      SUM(a."60days")   AS sixty_days,
-      SUM(a."90days")   AS ninety_days
-    FROM aging_analysis a
-    JOIN statements s ON a.aging_key = s.agingid
-    JOIN m5_client  c ON a.clientid  = c.m5clientkey
-    WHERE TRIM(to_char(s.generation_date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM s.generation_date)::text = $2
-    GROUP BY c.m5clientkey, c.client
-    ORDER BY c.client
-  `
-  const result = await client.query(query, [month, year])
-  return result.rows.map((row) => ({
-    clientId: row.client_id,
-    client: row.client_name,
-    current: parseFloat(row.current_amount) || 0,
-    thirtyDays: parseFloat(row.thirty_days) || 0,
-    sixtyDays: parseFloat(row.sixty_days) || 0,
-    ninetyDays: parseFloat(row.ninety_days) || 0,
+  const asAt = agingAsAtForMonth(month, year)
+  if (!asAt) return []
+
+  const [clients, aging] = await Promise.all([
+    client.query("SELECT m5clientkey, client FROM m5_client ORDER BY client"),
+    agingForAllClients(client, asAt),
+  ])
+
+  return clients.rows.map((row) => ({
+    clientId: row.m5clientkey,
+    client: row.client,
+    ...toAgingRow(aging.get(row.m5clientkey)?.buckets || ZERO_AGING),
   }))
 }
 
@@ -921,6 +930,159 @@ const getTurnoverVsFuelPerTruck = async (client, month, year, truckId = null) =>
   })
 
   console.log("Processed turnover vs fuel per truck data:", data)
+  return data
+}
+
+// Truck Income vs Truck Expenses (per truck)
+//
+// Income per truck = the same per-leg turnover allocation used by
+// getTurnoverPerTruck (add-on instructions fall back to the linked add-on amount).
+//
+// Expense per truck has two sources that are deliberately kept from
+// double-counting each other:
+//   * Fuel comes from expenses_with_po_v (type = 'fuel', expensecost) exactly as
+//     the Fuel-per-Truck / Diesel charts read it, keyed on expenses_m2.truckid.
+//   * Everything else (parts, repairs, tyres, towing, etc.) comes from
+//     purchase_orders, EXCLUDING the fuel expense type (5) because those fuel POs
+//     are the same money already captured above via expenses_m2.
+//
+// Non-fuel purchase_orders carry no truckid in the data — only a free-text
+// reg_no — so they are matched to a truck by a normalised registration key
+// (upper-cased, stripped of everything but A-Z/0-9). Rows that match no active
+// in-house truck (blank regs, "workshop", trailers, sub/inactive trucks) collect
+// under a single "Unassigned / Workshop" row so no spend is silently dropped.
+// When a specific truck is selected that bucket is excluded.
+const getTruckIncomeVsExpense = async (client, month, year, truckId = null) => {
+  const params = [month, year]
+  const incomeTruckFilter = truckId ? "AND t.m5truckskey = $3" : ""
+  const fuelTruckFilter = truckId ? "AND t.m5truckskey = $3" : ""
+  const otherTruckFilter = truckId ? "AND tk.m5truckskey = $3" : ""
+  if (truckId) params.push(truckId)
+
+  const query = `
+    WITH DeduplicatedLegs AS (
+      SELECT DISTINCT m1key, legnumber, truckregnumber
+      FROM legs_m2
+    ),
+    DistinctLegs AS (
+      SELECT m1key, COUNT(DISTINCT legnumber) AS num_legs
+      FROM DeduplicatedLegs
+      GROUP BY m1key
+    ),
+    TruckCountsPerLeg AS (
+      SELECT m1key, legnumber, COUNT(DISTINCT truckregnumber) AS trucks_per_leg
+      FROM DeduplicatedLegs
+      GROUP BY m1key, legnumber
+    ),
+    IncomePerTruck AS (
+      SELECT
+        l.truckregnumber,
+        SUM(
+          (CASE WHEN m.shipment_type = 5 THEN COALESCE(ao.amount, 0) ELSE m.total_cost END)
+          / dl.num_legs / tcpl.trucks_per_leg
+        ) AS total_income
+      FROM DeduplicatedLegs l
+      JOIN m1_controller m ON l.m1key = m.m1key
+      LEFT JOIN add_ons ao ON m.addon_id = ao.addon_id
+      JOIN DistinctLegs dl ON l.m1key = dl.m1key
+      JOIN TruckCountsPerLeg tcpl ON l.m1key = tcpl.m1key AND l.legnumber = tcpl.legnumber
+      JOIN m5_trucks t ON l.truckregnumber = t.truckregnum
+      WHERE t.is_subcontractor = false
+        AND t.status = true
+        AND TRIM(TO_CHAR(m.created_at, 'Month')) = $1
+        AND EXTRACT(YEAR FROM m.created_at)::TEXT = $2
+        ${incomeTruckFilter}
+      GROUP BY l.truckregnumber
+    ),
+    FuelPerTruck AS (
+      SELECT
+        t.truckregnum AS truckregnumber,
+        COALESCE(SUM(e.expensecost), 0) AS fuel_cost
+      FROM expenses_with_po_v e
+      JOIN m5_trucks t ON e.truckid = t.m5truckskey
+      WHERE e.type = 'fuel'
+        AND t.is_subcontractor = false
+        AND t.status = true
+        AND TRIM(to_char(e.expense_date, 'Month')) = $1
+        AND EXTRACT(YEAR FROM e.expense_date)::TEXT = $2
+        ${fuelTruckFilter}
+      GROUP BY t.truckregnum
+    ),
+    TruckKeys AS (
+      SELECT
+        m5truckskey,
+        truckregnum,
+        regexp_replace(upper(truckregnum), '[^A-Z0-9]', '', 'g') AS norm
+      FROM m5_trucks
+      WHERE is_subcontractor = false AND status = true
+    ),
+    OtherPerTruck AS (
+      SELECT
+        COALESCE(tk.truckregnum, 'Unassigned / Workshop') AS truckregnumber,
+        COALESCE(SUM(po.total), 0) AS other_cost
+      FROM purchase_orders po
+      LEFT JOIN TruckKeys tk
+        ON tk.norm <> ''
+        AND regexp_replace(upper(COALESCE(po.reg_no, '')), '[^A-Z0-9]', '', 'g') = tk.norm
+      WHERE COALESCE(po.expense_type_id, 0) <> 5
+        AND TRIM(to_char(po.date, 'Month')) = $1
+        AND EXTRACT(YEAR FROM po.date)::TEXT = $2
+        ${otherTruckFilter}
+      GROUP BY COALESCE(tk.truckregnum, 'Unassigned / Workshop')
+    )
+    SELECT
+      COALESCE(i.truckregnumber, f.truckregnumber, o.truckregnumber) AS truckregnumber,
+      COALESCE(i.total_income, 0) AS total_income,
+      COALESCE(f.fuel_cost, 0) AS fuel_cost,
+      COALESCE(o.other_cost, 0) AS other_cost,
+      COALESCE(f.fuel_cost, 0) + COALESCE(o.other_cost, 0) AS total_expense
+    FROM IncomePerTruck i
+    FULL OUTER JOIN FuelPerTruck f ON i.truckregnumber = f.truckregnumber
+    FULL OUTER JOIN OtherPerTruck o
+      ON COALESCE(i.truckregnumber, f.truckregnumber) = o.truckregnumber
+    ORDER BY total_income DESC, total_expense DESC
+  `
+
+  const result = await client.query(query, params)
+  console.log("Truck income vs expense query result:", result.rows)
+  console.log(`Query returned ${result.rows.length} rows`)
+
+  if (!result.rows || result.rows.length === 0) {
+    console.log(`No rows returned for ${month} ${year}. Check query or data.`)
+    return []
+  }
+
+  const totalIncome = result.rows.reduce(
+    (sum, row) => sum + Number.parseFloat(row.total_income || 0),
+    0
+  )
+  const totalExpense = result.rows.reduce(
+    (sum, row) => sum + Number.parseFloat(row.total_expense || 0),
+    0
+  )
+
+  const data = result.rows.map((row) => {
+    const income = Number.parseFloat(row.total_income || 0)
+    const fuelCost = Number.parseFloat(row.fuel_cost || 0)
+    const otherCost = Number.parseFloat(row.other_cost || 0)
+    const expense = Number.parseFloat(row.total_expense || 0)
+    const incomePercentage = totalIncome > 0 ? ((income / totalIncome) * 100).toFixed(2) : 0
+    const expensePercentage = totalExpense > 0 ? ((expense / totalExpense) * 100).toFixed(2) : 0
+    return {
+      truckregnumber: row.truckregnumber,
+      total_income: income,
+      fuel_cost: fuelCost,
+      other_cost: otherCost,
+      total_expense: expense,
+      profit: Number((income - expense).toFixed(2)),
+      incomePercentage: Number.parseFloat(incomePercentage),
+      expensePercentage: Number.parseFloat(expensePercentage),
+      month_name: month.trim(),
+      year: year.toString(),
+    }
+  })
+
+  console.log("Processed truck income vs expense data:", data)
   return data
 }
 
@@ -1498,6 +1660,7 @@ export {
   getWagesVsExpenses,
   getTurnoverVsSubbieExpense,
   getTurnoverVsFuelPerTruck,
+  getTruckIncomeVsExpense,
   getPaymentsReceivedPerMonth,
   getPaymentClients,
   getClientSubbieCommissionReport,

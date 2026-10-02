@@ -36,6 +36,7 @@ import {
   fetchSubcontractorVsTurnover,
   fetchTurnoverVsSubbieExpense,
   fetchTurnoverVsFuelPerTruck,
+  fetchTruckIncomeVsExpense,
   fetchPaymentClients,
   fetchPaymentsReceivedPerMonth,
 } from "../AnalyticsFunctions";
@@ -169,6 +170,15 @@ export default function DirectorAnalytics() {
               setError
             );
             break;
+          case "truckIncomeVsExpense":
+            data = await fetchTruckIncomeVsExpense(
+              activeMonth,
+              activeYear,
+              selectedTruck,
+              setIsLoading,
+              setError
+            );
+            break;
           case "paymentsReceivedPerMonth":
             data = await fetchPaymentsReceivedPerMonth(activeMonth, activeYear, selectedClient, setIsLoading, setError);
             break;
@@ -265,7 +275,41 @@ export default function DirectorAnalytics() {
     return null;
   };
 
-  
+  const TruckIncomeExpenseTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const row = payload[0].payload || {};
+      const fmt = (v) =>
+        `R${(Number(v) || 0).toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`;
+      return (
+        <div className="custom-tooltip">
+          <p className="tooltip-label">{label}</p>
+          <p className="tooltip-value" style={{ color: "#4169E1" }}>
+            {`Income: ${fmt(row.income)}`}
+          </p>
+          <p className="tooltip-value" style={{ color: "#FF6347" }}>
+            {`Expenses: ${fmt(row.expense)}`}
+          </p>
+          <p className="tooltip-value" style={{ color: "#888" }}>
+            {`  • Fuel: ${fmt(row.fuelCost)}`}
+          </p>
+          <p className="tooltip-value" style={{ color: "#888" }}>
+            {`  • Maintenance/Other: ${fmt(row.otherCost)}`}
+          </p>
+          <p
+            className="tooltip-value"
+            style={{ color: row.profit >= 0 ? "#4CAF50" : "#F44336" }}
+          >
+            {`Profit: ${fmt(row.profit)}`}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   const renderChart = () => {
     console.log("Rendering chart with chartData:", chartData);
     const chartWidth = getChartWidth(chartData.length, activeFilter);
@@ -1177,6 +1221,119 @@ export default function DirectorAnalytics() {
           </div>
         );
 
+      case "truckIncomeVsExpense":
+        return (
+          <div className="chart-wrapper">
+            {isLoading ? (
+              <div className="loading-indicator">
+                Loading truck income vs expense data...
+              </div>
+            ) : error ? (
+              <div className="error-message">{error}</div>
+            ) : !Array.isArray(chartData) || chartData.length === 0 ? (
+              <div className="no-data-message">
+                No truck income vs expense data available for {activeMonth}{" "}
+                {activeYear}
+              </div>
+            ) : (
+              <>
+                <div className="chart-header">
+                  <div className="chart-header-item">
+                    <span className="legend-color royal-blue"></span>
+                    <span>Income</span>
+                  </div>
+                  <div className="chart-header-item">
+                    <span className="legend-color tomato"></span>
+                    <span>Expenses (Fuel + Maintenance)</span>
+                  </div>
+                </div>
+                <div className="chart-scroll-container">
+                  <ResponsiveContainer width={chartWidth} height="100%">
+                    <BarChart
+                      data={
+                        selectedTruck
+                          ? chartData
+                          : [
+                            {
+                              truckId: "Totals (All Trucks)",
+                              income: chartData.reduce(
+                                (sum, item) => sum + (item.income || 0),
+                                0
+                              ),
+                              expense: chartData.reduce(
+                                (sum, item) => sum + (item.expense || 0),
+                                0
+                              ),
+                              fuelCost: chartData.reduce(
+                                (sum, item) => sum + (item.fuelCost || 0),
+                                0
+                              ),
+                              otherCost: chartData.reduce(
+                                (sum, item) => sum + (item.otherCost || 0),
+                                0
+                              ),
+                              profit: chartData.reduce(
+                                (sum, item) => sum + (item.profit || 0),
+                                0
+                              ),
+                              month: chartData[0]?.month,
+                              year: chartData[0]?.year,
+                            },
+                          ]
+                      }
+                      margin={{ top: 40, right: 30, left: 60, bottom: 24 }}
+                    >
+                      <XAxis
+                        dataKey="truckId"
+                        angle={0}
+                        textAnchor="middle"
+                        height={60}
+                        interval={0}
+                        tick={{ fontSize: 13 }}
+                      />
+                      <YAxis
+                        label={{
+                          value: "Amount (R)",
+                          angle: 0,
+                          position: "top",
+                          dy: -20,
+                        }}
+                      />
+                      <Tooltip content={<TruckIncomeExpenseTooltip />} />
+                      <Bar
+                        dataKey="income"
+                        name="Income"
+                        fill="#4169E1"
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={160}
+                      >
+                        <LabelList
+                          dataKey="income"
+                          content={CustomBarLabelForTurnover}
+                          position="top"
+                        />
+                      </Bar>
+                      <Bar
+                        dataKey="expense"
+                        name="Expenses"
+                        fill="#FF6347"
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={160}
+                      >
+                        <LabelList
+                          dataKey="expense"
+                          content={CustomBarLabelForTurnover}
+                          position="top"
+                        />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
+            )}
+          </div>
+        );
+
       case "paymentsReceivedPerMonth":
         return (
           <div className="chart-wrapper">
@@ -1335,7 +1492,8 @@ export default function DirectorAnalytics() {
                 ))}
               </select>
             )}
-          {activeFilter === "turnoverVsFuelPerTruck" && (
+          {(activeFilter === "turnoverVsFuelPerTruck" ||
+            activeFilter === "truckIncomeVsExpense") && (
             <select
               value={selectedTruck}
               onChange={(e) => setSelectedTruck(e.target.value)}
@@ -1387,6 +1545,9 @@ export default function DirectorAnalytics() {
               <option value="turnoverVsFuelPerTruck">
                 Turnover Per Truck VS Diesel
               </option>
+              <option value="truckIncomeVsExpense">
+                Truck Income VS Truck Expenses
+              </option>
               <option value="paymentsReceivedPerMonth">
                 Payments Received per Month
               </option>
@@ -1414,6 +1575,8 @@ export default function DirectorAnalytics() {
                 "Turnover VS Subbie Expense"}
               {activeFilter === "turnoverVsFuelPerTruck" &&
                 "Turnover Per Truck VS Diesel"}
+              {activeFilter === "truckIncomeVsExpense" &&
+                "Truck Income VS Truck Expenses"}
               {activeFilter === "paymentsReceivedPerMonth" &&
                 "Payments Received per Month"}
             </h2>

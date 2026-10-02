@@ -23,6 +23,7 @@ export const getChartWidth = (dataLength, activeFilter) => {
     activeFilter === "incomeVsExpense" ||
     activeFilter === "turnoverVsSubbieExpense" ||
     activeFilter === "turnoverVsFuelPerTruck" ||
+    activeFilter === "truckIncomeVsExpense" ||
     activeFilter === "paymentsReceivedPerMonth"
   ) {
     return 1000;
@@ -842,6 +843,49 @@ export const fetchTurnoverVsFuelPerTruck = async (month, year, truckId, setIsLoa
     }
   } catch (err) {
     console.error("Error fetching turnover vs fuel per truck:", err);
+    setError(err.message);
+    return [];
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+export const fetchTruckIncomeVsExpense = async (month, year, truckId, setIsLoading, setError) => {
+  setIsLoading(true);
+  setError(null);
+  try {
+    console.log(
+      `Fetching truck income vs expense for month: ${month}, year: ${year}, truckId: ${truckId}`
+    );
+    const response = await api.get("/api/truck-income-vs-expense", {
+      params: {
+        month,
+        year,
+        truckId: truckId || undefined,
+        _t: new Date().getTime(),
+      },
+    });
+    console.log("API response:", response.data);
+    if (response.data.success) {
+      const processedData = response.data.data.map((item) => ({
+        truckId: item.truckregnumber || "Unassigned / Workshop",
+        income: Number.parseFloat(item.total_income) || 0,
+        expense: Number.parseFloat(item.total_expense) || 0,
+        fuelCost: Number.parseFloat(item.fuel_cost) || 0,
+        otherCost: Number.parseFloat(item.other_cost) || 0,
+        profit: Number.parseFloat(item.profit) || 0,
+        month: item.month_name ? item.month_name.trim() : month.trim(),
+        year: item.year,
+        incomePercentage: Number.parseFloat(item.incomePercentage) || 0,
+        expensePercentage: Number.parseFloat(item.expensePercentage) || 0,
+      }));
+      console.log("Processed truck income vs expense data:", processedData);
+      return processedData;
+    } else {
+      throw new Error(response.data.message || "Failed to fetch data");
+    }
+  } catch (err) {
+    console.error("Error fetching truck income vs expense:", err);
     setError(err.message);
     return [];
   } finally {
