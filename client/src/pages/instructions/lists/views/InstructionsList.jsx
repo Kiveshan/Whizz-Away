@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from "react-router-dom"
 import "../../css/InstructionsList.css"
 import api from "../../../../api"
 import Pagination from "../../../../components/Pagination"
+import { useInstructionSearch } from "../../../../hooks/useInstructionSearch"
 
 // Bell icon component with shake animation using SVG - exactly like in CompanyInstructions.jsx
 const BellIcon = () => {
@@ -85,8 +86,8 @@ const Instructions = () => {
   const clientName = location.state?.clientName
 
   // Initialize state with current month and year
-  const [selectedMonth, setSelectedMonth] = useState(location.state?.containerSearch ? "" : getCurrentMonthName())
-  const [selectedYear, setSelectedYear] = useState(location.state?.containerSearch ? "" : getCurrentYear())
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthName())
+  const [selectedYear, setSelectedYear] = useState(getCurrentYear())
   const [activeFilter, setActiveFilter] = useState(location.state?.activeFilter || "All")
 
   const [instructions, setInstructions] = useState([])
@@ -94,10 +95,15 @@ const Instructions = () => {
   const [error, setError] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [recordsPerPage] = useState(10)
-  const [containerSearch, setContainerSearch] = useState(location.state?.containerSearch || "")
-  const [debouncedSearch, setDebouncedSearch] = useState(location.state?.containerSearch || "")
-  const [containerSearchLoading, setContainerSearchLoading] = useState(false)
-  const [searchMatchedKeys, setSearchMatchedKeys] = useState(null)
+  const {
+    query: containerSearch,
+    setQuery: setContainerSearch,
+    isSearching,
+    matchedKeys,
+    loading: containerSearchLoading,
+    error: searchError,
+    retry: retrySearch,
+  } = useInstructionSearch(location.state?.containerSearch || "", clientId)
 
   // Add the shake animation when component mounts - exactly like in CompanyInstructions.jsx
   useEffect(() => {
@@ -175,7 +181,9 @@ const Instructions = () => {
     let filtered = [...instructions]
 
     // Filter by month and year if selected
-    if (selectedMonth) {
+    // An active search looks across every month, type and status, so a match is never
+    // hidden by a filter the user has forgotten is set.
+    if (selectedMonth && !isSearching) {
       filtered = filtered.filter((item) => {
         const date = new Date(item.startingdate || item.pickupdate)
         const monthNames = [
@@ -196,7 +204,7 @@ const Instructions = () => {
       })
     }
 
-    if (selectedYear) {
+    if (selectedYear && !isSearching) {
       filtered = filtered.filter((item) => {
         const date = new Date(item.startingdate || item.pickupdate)
         return date.getFullYear().toString() === selectedYear
@@ -204,7 +212,7 @@ const Instructions = () => {
     }
 
     // Filter by status or type
-    if (activeFilter !== "All") {
+    if (activeFilter !== "All" && !isSearching) {
       const normalizedActiveFilter = (activeFilter || "").toLowerCase()
       if (["new", "in progress", "completed"].includes(normalizedActiveFilter)) {
         filtered = filtered.filter(
@@ -243,8 +251,8 @@ const Instructions = () => {
       }
     }
 
-    if (searchMatchedKeys !== null) {
-      filtered = filtered.filter((item) => searchMatchedKeys.has(String(item.m1key)))
+    if (isSearching) {
+      filtered = matchedKeys ? filtered.filter((item) => matchedKeys.has(String(item.m1key))) : []
     }
 
     // Sort by status priority first, then by instruction number (descending)
@@ -266,36 +274,6 @@ const Instructions = () => {
     return filtered
   }
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(containerSearch), 400)
-    return () => clearTimeout(timer)
-  }, [containerSearch])
-
-  useEffect(() => {
-    if (!debouncedSearch.trim()) {
-      setSearchMatchedKeys(null)
-      setContainerSearchLoading(false)
-      return
-    }
-
-    const runSearch = async () => {
-      try {
-        setContainerSearchLoading(true)
-        const params = new URLSearchParams({ q: debouncedSearch.trim() })
-        if (clientId) params.append("clientId", clientId)
-        const response = await api.get(`/api/instructions/search?${params}`)
-        const matched = new Set((response.data || []).map((i) => String(i.m1key)))
-        setSearchMatchedKeys(matched)
-      } catch (err) {
-        console.error("Error running instruction search", err)
-      } finally {
-        setContainerSearchLoading(false)
-      }
-    }
-
-    runSearch()
-  }, [debouncedSearch, clientId])
-
   // Pagination logic
   const filteredInstructions = getFilteredInstructions()
   const indexOfLastRecord = currentPage * recordsPerPage
@@ -309,7 +287,7 @@ const Instructions = () => {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [selectedMonth, selectedYear, activeFilter])
+  }, [selectedMonth, selectedYear, activeFilter, matchedKeys])
 
   // Function to render status with bell for "New" status - exactly like in CompanyInstructions.jsx
   const renderStatus = (status) => {
@@ -458,7 +436,7 @@ const Instructions = () => {
         <div style={{ margin: "10px 0", textAlign: "center" }}>
           <input
             type="text"
-            placeholder="Search by container number or client ref"
+            placeholder="Search by container, client ref, booking ref, KSM ref or instruction #"
             value={containerSearch}
             onChange={(e) => setContainerSearch(e.target.value)}
             style={{
@@ -469,6 +447,19 @@ const Instructions = () => {
             }}
           />
         </div>
+        {isSearching && !containerSearchLoading && !searchError && (
+          <div style={{ margin: "0 0 10px", textAlign: "center", fontSize: "14px", color: "#555" }}>
+            {filteredInstructions.length} {filteredInstructions.length === 1 ? "match" : "matches"} across all
+            months, types and statuses.{" "}
+            <button
+              type="button"
+              onClick={() => setContainerSearch("")}
+              style={{ background: "none", border: "none", padding: 0, color: "#1a73e8", cursor: "pointer", textDecoration: "underline", font: "inherit" }}
+            >
+              Clear search
+            </button>
+          </div>
+        )}
         <div className="tables-container">
           {loading ? (
             <p>Loading instructions...</p>
@@ -495,9 +486,22 @@ const Instructions = () => {
     <tr>
       <td colSpan="10">Searching...</td>
     </tr>
-  ) : currentInstructions.length === 0 ? (
+  ) : searchError ? (
     <tr>
-      <td colSpan="10">No instructions found</td>
+      <td colSpan="10">
+        {searchError}{" "}
+        <button type="button" className="view-btn" onClick={retrySearch}>
+          Try again
+        </button>
+      </td>
+    </tr>
+  ) : filteredInstructions.length === 0 ? (
+    <tr>
+      <td colSpan="10">
+        {isSearching
+          ? "No instructions match that container, client ref, booking ref, KSM ref or instruction #"
+          : "No instructions found"}
+      </td>
     </tr>
   ) : (
     currentInstructions.map((item) => {

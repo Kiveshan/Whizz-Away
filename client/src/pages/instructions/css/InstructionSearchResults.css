@@ -1,0 +1,99 @@
+/* Compact, single-line rows so a full page of search results fits on screen.
+   Row height is fixed; InstructionSearchResults.jsx sizes the page from it. */
+
+.instruction-search-results-summary {
+  margin: 0 0 6px;
+  text-align: center;
+  font-size: 13px;
+  color: #555;
+}
+
+.instruction-search-results {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+}
+
+.instruction-search-results thead {
+  background-color: #93c5fd;
+}
+
+.instruction-search-results th,
+.instruction-search-results td {
+  height: 32px;
+  padding: 0 8px;
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.instruction-search-results th {
+  font-weight: bold;
+  color: #1f2937;
+}
+
+.instruction-search-results td {
+  color: #374151;
+}
+
+.instruction-search-results tbody tr:hover {
+  background-color: #f3f4f6;
+}
+
+.instruction-search-results td.instruction-search-results-message {
+  text-align: center;
+  white-space: normal;
+}
+
+.instruction-search-results-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.instruction-search-results-button {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.instruction-search-results-button:hover {
+  background-color: #2563eb;
+}
+
+.instruction-search-results-button.secondary {
+  background-color: #e5e7eb;
+  color: #1f2937;
+}
+
+.instruction-search-results-button.secondary:hover {
+  background-color: #d1d5db;
+}
+
+/* Cells whose text is cut off can be clicked to expand the row. */
+.instruction-search-results td.instruction-search-results-expandable {
+  cursor: pointer;
+}
+
+.instruction-search-results tr.expanded {
+  background-color: #eff6ff;
+}
+
+.instruction-search-results tr.expanded td {
+  height: auto;
+  padding: 6px 8px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+
