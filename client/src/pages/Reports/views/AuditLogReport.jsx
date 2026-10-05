@@ -17,6 +17,7 @@ const ENTITY_LABELS = {
   auth: "Authentication",
   client: "Clients",
   client_rate: "Client rates",
+  client_statement: "Client statements",
   company: "Companies",
   credit_note: "Credit notes",
   document: "Documents",

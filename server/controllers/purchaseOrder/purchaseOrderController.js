@@ -147,6 +147,17 @@ export const uploadPurchaseOrderSlipHandler = async (req, res) => {
     return res.status(400).json({ error: "Missing required fields" })
   }
 
+  // Input VAT can be at most 15% of the excl.-VAT cost. Fuel slips were being
+  // captured with the slip total as the VAT, doubling diesel in the VAT-inclusive
+  // analytics (and in any VAT figures read from these POs).
+  const cost = parseFloat(expenseCost) || 0
+  const inputVat = vat ? parseFloat(vat) : 0
+  if (Number.isNaN(inputVat) || inputVat < 0 || inputVat > Math.round(cost * 15) / 100 + 0.01) {
+    return res.status(400).json({
+      error: `Input VAT can't be more than 15% of the cost (R${(cost * 0.15).toFixed(2)}). Enter only the VAT shown on the slip; diesel is zero-rated, so a diesel-only slip has no VAT.`,
+    })
+  }
+
   // Generate S3 key based on expense type
   let folderKey;
   let uniqueFileName;

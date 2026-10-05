@@ -143,6 +143,20 @@ const ExpenseSubmission = ({ onBack }) => {
       return;
     }
 
+    // Input VAT is at most 15% of the excl.-VAT cost (the server enforces the same
+    // rule). Entering the slip total here double-counts it in the VAT analytics.
+    const cost = Number.parseFloat(formData.expenseCost) || 0;
+    const inputVat = Number.parseFloat(formData.vat) || 0;
+    if (inputVat > Math.round(cost * 15) / 100 + 0.01) {
+      setSubmitMessage(
+        `Error: Input VAT can't be more than 15% of the cost (R${(cost * 0.15).toFixed(2)}). ` +
+          "Enter only the VAT shown on the slip, not the slip total. Diesel is zero-rated, so a diesel-only slip has no VAT."
+      );
+      setIsSubmitting(false);
+      submittingRef.current = false;
+      return;
+    }
+
     try {
       const formDataToSend = new FormData();
       if (expenseType === 5) {
@@ -231,7 +245,7 @@ const ExpenseSubmission = ({ onBack }) => {
       // Rest of the submit logic remains unchanged
     } catch (error) {
       console.error("Error submitting expense:", error);
-      setSubmitMessage(`Error: ${error.message}`);
+      setSubmitMessage(`Error: ${error.response?.data?.error || error.message}`);
       setUploadProgress(0);
     } finally {
       setIsSubmitting(false);

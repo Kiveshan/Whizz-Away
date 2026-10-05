@@ -15,6 +15,7 @@ import {
   getWagesVsExpenses,
   getTurnoverVsSubbieExpense,
   getTurnoverVsFuelPerTruck,
+  getTruckIncomeVsExpense,
   getPaymentsReceivedPerMonth,
   getPaymentClients,
   getClientSubbieCommissionReport,
@@ -268,6 +269,24 @@ const getTurnoverVsFuelPerTruckController = async (req, res) => {
   }
 };
 
+const getTruckIncomeVsExpenseController = async (req, res) => {
+  const { month, year, truckId } = req.query;
+  console.log(`Received request for truck income vs expense: month=${month}, year=${year}, truckId=${truckId}`);
+  try {
+    const client = await pool.connect();
+    try {
+      const data = await getTruckIncomeVsExpense(client, month, year, truckId);
+      console.log("Truck income vs expense data:", data);
+      res.status(200).json({ success: true, data });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Error in getTruckIncomeVsExpenseController:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 const getPaymentsReceivedPerMonthController = async (req, res) => {
   const { month, year, clientId } = req.query;
   console.log(`Received request for payments received per month: month=${month}, year=${year}, clientId=${clientId}`);
@@ -344,6 +363,7 @@ export {
   getWagesVsExpensesController,
   getTurnoverVsSubbieExpenseController,
   getTurnoverVsFuelPerTruckController,
+  getTruckIncomeVsExpenseController,
   getPaymentsReceivedPerMonthController,
   getPaymentClientsController,
   getClientSubbieCommissionReportController,

@@ -142,8 +142,6 @@ export const AUDIT_ROUTES = [
   { method: "POST", path: "/api/credit-notes", action: "CREDIT_NOTE_CREATED", entity: "credit_note" },
 
   // --- Statements ----------------------------------------------------------
-  { method: "POST", path: "/api/statements/generate", action: "STATEMENTS_GENERATED", entity: "statement" },
-  { method: "POST", path: "/api/statements/regenerate", action: "STATEMENTS_REGENERATED", entity: "statement" },
   { method: "POST", path: "/subcontractor/generate-statement", action: "SUBCONTRACTOR_STATEMENT_GENERATED", entity: "statement" },
   { method: "POST", path: "/subcontractor/backfill-statements", action: "SUBCONTRACTOR_STATEMENTS_BACKFILLED", entity: "statement" },
 
@@ -152,6 +150,13 @@ export const AUDIT_ROUTES = [
   // down for the two POSTs; they are registered here anyway so the route table
   // stays a complete map of what is audited. Retrieving a stored document is a
   // sensitive read — it is how a historical financial document leaves the system.
+  // Client statement export snapshots. The controller writes richer rows via
+  // auditFromReq (balance, aging, content hash), so the middleware stands down
+  // for the POSTs; registered here so the route table stays a complete map.
+  { method: "POST", path: "/api/statements/:statementId/export", action: "CLIENT_STATEMENT_EXPORTED", entity: "client_statement", target: "statementId" },
+  { method: "POST", path: "/api/statement-exports/:exportId/document", action: "CLIENT_STATEMENT_DOCUMENT_STORED", entity: "client_statement", target: "exportId" },
+  { method: "GET", path: "/api/statement-exports/:exportId", action: "CLIENT_STATEMENT_SNAPSHOT_VIEWED", entity: "client_statement", target: "exportId", sensitive: true },
+
   { method: "POST", path: "/subcontractor/statements/export", action: "SUBCONTRACTOR_STATEMENT_EXPORTED", entity: "subcontractor_statement" },
   { method: "POST", path: "/subcontractor/statements/exports/:exportId/document", action: "SUBCONTRACTOR_STATEMENT_DOCUMENT_STORED", entity: "subcontractor_statement", target: "exportId" },
   { method: "GET", path: "/subcontractor/statements/exports/:exportId", action: "SUBCONTRACTOR_STATEMENT_SNAPSHOT_VIEWED", entity: "subcontractor_statement", target: "exportId", sensitive: true },

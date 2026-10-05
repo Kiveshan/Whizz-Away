@@ -15,6 +15,7 @@ import {
   getWagesVsExpensesController,
   getTurnoverVsSubbieExpenseController,
   getTurnoverVsFuelPerTruckController,
+  getTruckIncomeVsExpenseController,
   getPaymentsReceivedPerMonthController,
   getPaymentClientsController,
   getClientSubbieCommissionReportController,
@@ -47,6 +48,8 @@ router.get("/api/turnover-vs-subbie-expense", verifyToken,
   getTurnoverVsSubbieExpenseController);
 router.get("/api/turnover-vs-fuel-per-truck", verifyToken,
   getTurnoverVsFuelPerTruckController);
+router.get("/api/truck-income-vs-expense", verifyToken,
+  getTruckIncomeVsExpenseController);
 router.get("/api/payments-received-per-month", verifyToken, getPaymentsReceivedPerMonthController);
 router.get("/api/payment-clients", verifyToken, getPaymentClientsController);
 router.get(

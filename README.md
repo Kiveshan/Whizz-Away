@@ -2,7 +2,7 @@
 
 ## 1. System Overview
 
-A full-stack operations and financial management platform built for a logistics client, covering the complete job lifecycle from instruction creation through invoicing, payment allocation, and monthly financial reporting. The system manages multiple actor roles (controllers, finance clerks, directors, subcontractors) across a shared PostgreSQL database, with document storage in S3 and automated monthly statement generation driven by AWS EventBridge.
+A full-stack operations and financial management platform built for a logistics client, covering the complete job lifecycle from instruction creation through invoicing, payment allocation, and monthly financial reporting. The system manages multiple actor roles (controllers, finance clerks, directors, subcontractors) across a shared PostgreSQL database, with document storage in S3 and client statements derived on demand from the payment ledger.
 
 ---
 
@@ -16,17 +16,12 @@ flowchart TD
     PG[("PostgreSQL\nConnection pool — max 20")]
     S3_DOCS["AWS S3\nEmployee & Truck Docs"]
     S3_OPS["AWS S3\nAssignment & Fuel-slip Docs"]
-    EventBridge["AWS EventBridge\nScheduler"]
-    Lambda["AWS Lambda\nStatement Trigger"]
 
     Browser -->|HTTPS| Nginx
     Nginx -->|proxy_pass| Express
     Express -->|pg pool — parameterised SQL| PG
     Express -->|multer-s3 upload\npresigned URL read| S3_DOCS
     Express -->|multer upload\ns3.upload| S3_OPS
-    EventBridge -->|monthly schedule| Lambda
-    Lambda -->|POST with API_SECRET header| Express
-    Express -->|generate + upsert| PG
 ```
 
 **Request lifecycle (authenticated API call):**
@@ -36,8 +31,8 @@ flowchart TD
 4. Controller calls the model layer, which executes a parameterised `pg` query.
 5. Response JSON is returned; for document access, a time-limited S3 presigned URL is generated server-side and returned to the client.
 
-**Scheduled statement generation:**
-EventBridge fires a Lambda on the 1st of each month. Lambda calls `POST /api/statements/generate` with an `API_SECRET` bearer token. Express authenticates the token separately from the user JWT path and runs `generateMonthlyStatements()` inside a single PostgreSQL transaction.
+**Client statements:**
+Derived on demand when a statement is opened — there is no generation step or scheduled job. Exporting a statement freezes its figures in `client_statement_exports` and stores the rendered PDF/XLSX in S3 (see Architecture Decisions).
 
 ---
 
@@ -64,7 +59,6 @@ EventBridge fires a Lambda on the 1st of each month. Lambda calls `POST /api/sta
 | Database client | node-postgres (`pg`) — raw SQL | Complex CTEs and lateral joins in the analytics layer are easier to write and reason about in raw SQL than in a query builder |
 | File storage | AWS S3 (af-south-1) | Durable object storage for compliance documents; presigned URLs keep credentials server-side |
 | File upload middleware | multer-s3 / multer | Streams multipart uploads directly to S3 without buffering to disk |
-| Scheduled jobs | AWS Lambda + EventBridge Scheduler | Decouples the monthly statement generation schedule from the application process, so a restart or deploy does not cause a missed run |
 | Reverse proxy | Nginx (AWS Elastic Beanstalk `.platform`) | Handles TLS termination and the 50 MB body limit needed for document uploads |
 | Runtime module system | ESM (`"type": "module"`) | Consistent module syntax across client and server; avoids CommonJS/ESM interop friction |
 
@@ -84,7 +78,7 @@ Each decision below states what was chosen, what else was on the table, the reas
 
 - **The domain is inherently relational.** The schema is 31 tables with 33 foreign-key relationships. An instruction has legs, legs have trucks and drivers, trucks have documents, an instruction produces an invoice, invoices are partially settled by payments, payments roll into statements. Modelling that in DynamoDB means either duplicating data across item collections or doing the joins in application code.
 - **Analytics queries are ad-hoc and aggregate-heavy.** `models/analytics/analyticsModel.js` is ~1,500 lines of SQL using CTEs, lateral joins, and window functions (42 occurrences of `WITH` / `JOIN LATERAL` / `OVER (` / `GROUP BY` in that one file). Revenue attribution across multi-leg instructions divides `total_cost` by a leg count and a per-leg truck count computed in sibling CTEs. DynamoDB has no joins, no aggregation, and no ad-hoc query capability — this would become a second analytics pipeline (stream → warehouse) to answer questions the database already answers directly.
-- **Money requires multi-row transactions.** Statement generation writes an aging-analysis row and a statement row per client across the entire client list inside a single `BEGIN`/`COMMIT`, rolling back the whole run on any failure (`utils/statementGenerator.js:337`). DynamoDB transactions cap at 100 items and cannot span an unbounded client list.
+- **Money requires multi-row transactions.** Recording a payment inserts the payment row and updates every invoice and add-on it is allocated across inside a single `BEGIN`/`COMMIT`, rolling back the whole allocation on any failure (`models/payments/paymentModel.js`). DynamoDB transactions cap at 100 items and cannot span an unbounded allocation.
 - **Financial correctness needs exact numerics.** `NUMERIC(12,2)` for currency, with `pg` type parsers overridden in `config/database.js` so values do not silently become floats. DynamoDB stores numbers as strings with its own precision rules and no server-side decimal arithmetic.
 - **Date arithmetic runs in the query.** Aging buckets, point-in-time rate lookups (`effective_from <= :date ORDER BY effective_date DESC LIMIT 1`), and VAT-period reporting are all date-range predicates the database evaluates against indexes.
 
@@ -114,31 +108,13 @@ The scale argument that usually favours DynamoDB does not apply: this is an inte
 
 ---
 
-**Decision:** Monthly statement aging is recomputed from live outstanding items at generation time, not derived from stored invoice totals.
+**Decision:** Client statements are derived on demand from the dated payment and credit-note ledgers, not generated and stored by a monthly job. What was actually sent to a client is frozen separately, at export time, in `client_statement_exports`.
 
-**Alternatives considered:** Carry-forward: take the previous statement's closing balance and add/subtract the month's activity.
+**Alternatives considered:** The previous design — an EventBridge → Lambda → `POST /api/statements/generate` job that wrote `statements` / `aging_analysis` rows on the 1st of each month (retired; see migrations 013–014). Carry-forward of the previous statement's closing balance.
 
-**Why this approach:** Carry-forward compounds any data errors month-over-month and makes backdated corrections difficult to reconcile. The current approach queries `m1_controller` (outstanding instructions) and `add_ons` (outstanding ad-hoc charges) with a `payment_status IN ('unpaid', 'partial')` filter and ages each item against the generation date, so the statement is always a true point-in-time snapshot of what is actually owed, not an accumulated ledger.
+**Why this approach:** The stored rows were not reproducible. The generator aged items using `m1_controller.payment_status` / `paid_amount` as they stood *when the job ran*, and those columns carry no history, so a stored month reflected whatever had been paid by the run date rather than the position at month end — and anything entered after the run never appeared. Every payment line in `payment_m3.line_items` carries its own `line_date` and item id, and every credit note is dated and tied to an instruction, so "what was owed on date D" is a date-filtered sum. `models/statements/statementDerivation.js` computes it for any client and month, and the aging reports (`getAgingAnalysis`, `getDebtorAgeAnalysisPerClient`) use the same code, so statements and analytics cannot disagree. Opening balance, month activity and closing balance reconcile by construction, and aging buckets always sum to the balance (unallocated credit is applied to the oldest debt first). Removing the job also removed the `API_SECRET`-authenticated public route, so `statementRoutes` now sits below the global auth guard.
 
-**Trade-offs:** More expensive to generate (two queries per client per month plus a previous-statement lookup for opening balance). If an instruction's payment status is incorrectly set, it propagates into every subsequent statement until corrected.
-
----
-
-**Decision:** Month-end statement generation is triggered by EventBridge Scheduler → Lambda → an authenticated HTTP endpoint, rather than by an in-process cron job.
-
-**Alternatives considered:** `node-cron` inside the Express process (this was the original implementation; the dependency has since been removed); a manual "generate statements" button in the finance UI.
-
-**Why this approach:** The trigger is the one part of this feature that must not depend on the application being alive at a specific instant.
-
-- **In-process cron misses the run if the process is not up at that moment.** Statement generation fires once a month, on the 1st. A deploy, a crash, an Elastic Beanstalk instance replacement, or an autoscaling event at that moment silently skips the run — and nothing surfaces the miss until a client asks where their statement is. EventBridge holds the schedule outside the application entirely, so the application's uptime at 00:00 on the 1st stops being a correctness dependency.
-- **A cron inside the app breaks the moment there is more than one instance.** With `node-cron`, every running instance fires its own timer, so scaling to two instances means generating every statement twice. EventBridge fires once regardless of how many instances are behind the load balancer — the schedule stops being coupled to the deployment topology.
-- **It gets retries and failure visibility for free.** EventBridge retries the Lambda on failure and can route exhausted attempts to a dead-letter queue; the run is observable in CloudWatch without building any of that into the app.
-- **The work stays in the application.** The Lambda is a trigger, not an implementation — it calls `POST /api/statements/generate` and the generation logic lives in `utils/statementGenerator.js`, next to the models and the pool it depends on. The same endpoint backs the manual regeneration path in the finance UI, so the scheduled and manual routes exercise identical code rather than drifting apart.
-- **Re-firing is safe.** `processClient()` looks up an existing statement for the period and updates it in place instead of inserting a duplicate, and the whole run is wrapped in one transaction that rolls back on any error. A retry, a duplicate delivery, or an operator regenerating a past month all converge on the same result rather than compounding.
-
-The endpoint authenticates the Lambda with a shared `API_SECRET` bearer token, checked before the JWT path — which is why `statementRoutes` is mounted *above* the global `verifyToken` guard in `routes/index.js:54`, so a non-JWT token is not rejected before reaching its own check.
-
-**Trade-offs:** Adds AWS resources that live outside the repo — the schedule and the Lambda are not version-controlled with the application, so the deployment is no longer fully described by this codebase. `API_SECRET` is a symmetric shared secret: anyone holding it can trigger arbitrary statement regeneration, and rotating it requires a coordinated change in both the Lambda's environment and the server's. Local development cannot exercise the scheduled path end-to-end; it is tested by calling the endpoint directly.
+**Trade-offs:** A back-dated invoice, payment or credit note changes what a past month derives to — correct for the books, but it means the screen can differ from the document a client received; the export snapshot is the record of the latter. Every open is computed live (a handful of queries per statement; two for an all-client aging report) rather than read from a row. The old `statements` / `aging_analysis` tables are left in place as history and are no longer written or read.
 
 ---
 
@@ -166,7 +142,7 @@ The endpoint authenticates the Lambda with a shared `API_SECRET` bearer token, c
 
 **Alternatives considered:** Applying `verifyToken` per route or per router module.
 
-**Why this approach:** Per-route middleware fails open — a new route added without the middleware is public, and nothing catches it. Mounting `router.use(verifyToken)` once in `routes/index.js` after the public block inverts that: a newly added route module is authenticated by default, and making something public requires a deliberate edit above the guard line with a comment explaining why. There are four such exceptions (auth, landing stats, the health check, and the statement generation route with its own `API_SECRET` check), each annotated in place. The frontend mirrors this with `RequireAuth` / `RequireRole` wrappers, but the server guard is the enforcement point — the client-side check is a UX affordance, not a security control.
+**Why this approach:** Per-route middleware fails open — a new route added without the middleware is public, and nothing catches it. Mounting `router.use(verifyToken)` once in `routes/index.js` after the public block inverts that: a newly added route module is authenticated by default, and making something public requires a deliberate edit above the guard line with a comment explaining why. There are three such exceptions (auth, landing stats, and the health check), each annotated in place. The frontend mirrors this with `RequireAuth` / `RequireRole` wrappers, but the server guard is the enforcement point — the client-side check is a UX affordance, not a security control.
 
 **Trade-offs:** Ordering in `routes/index.js` is now load-bearing. Moving a `router.use()` line across the guard silently changes the security posture of every route in that module, and nothing in the type system or tests catches it. The guard also forces the SPA's static assets to be served *before* the API router in `server.js:185`, since otherwise browser navigations would receive a `401 NO_TOKEN` JSON body instead of the React shell.
 
@@ -188,7 +164,7 @@ The endpoint authenticates the Lambda with a shared `API_SECRET` bearer token, c
 
 **Why this approach:** Tax invoices, wage slips, and financial exports are generated interactively, one at a time, by a user looking at the data on screen. Rendering client-side means the document is built from the exact view state already loaded — no second serialisation path that can drift from what the user saw — and it keeps headless Chrome, its memory footprint, and its cold-start latency off an Elastic Beanstalk instance that is also serving the API. The document never round-trips, so there is no temporary file to store or clean up, and no generation queue to operate.
 
-**Trade-offs:** Documents cannot be produced without a browser session, which rules out emailing a statement PDF from a scheduled job or the Lambda path — that is why statement generation writes rows to the database rather than producing files. Output fidelity depends on the client's browser, and large exports are bounded by the user's machine. Bulk generation (every wage slip for a month) is not possible in one operation.
+**Trade-offs:** Documents cannot be produced without a browser session, which rules out emailing a statement PDF from a scheduled job — which is why a statement's rendered file is uploaded by the browser at export time rather than produced server-side. Output fidelity depends on the client's browser, and large exports are bounded by the user's machine. Bulk generation (every wage slip for a month) is not possible in one operation.
 
 ---
 
@@ -288,7 +264,7 @@ AWS_ACCESS_KEY_ID=AKIA...
 AWS_SECRET_ACCESS_KEY=...
 S3_BUCKET_NAME=your-ops-bucket
 
-# Statement generation — used by the Lambda trigger
+# Shared secret for scheduled-job endpoints (authenticateScheduledJob in middleware/auth.js)
 API_SECRET=a-long-random-secret-shared-with-the-lambda
 
 # Application
@@ -370,7 +346,6 @@ npm start --prefix client
 │   │   ├── invoices/            # Invoice creation, container rate resolution
 │   │   └── wages/               # Point-in-time payroll calculation
 │   ├── utils/
-│   │   ├── statementGenerator.js           # Monthly client statement generation
 │   │   ├── subcontractorStatementGeneration.js  # Monthly subcontractor statements
 │   │   ├── wagesUtils.js                   # Tax bracket lookup, deduction history
 │   │   ├── s3Config.js                     # multer-s3 config for employee/truck docs

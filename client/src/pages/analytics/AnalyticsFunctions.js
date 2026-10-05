@@ -1,12 +1,6 @@
 import api from "../../api.js";
 
 // Utility Functions
-export const calculateTurnoverStatus = (turnover) => {
-  if (turnover >= 10000) return "high";
-  if (turnover >= 5000) return "medium";
-  return "low";
-};
-
 export const calculateStatus = (cost) => {
   if (cost <= 3500) return "good";
   if (cost <= 4500) return "warning";
@@ -23,6 +17,7 @@ export const getChartWidth = (dataLength, activeFilter) => {
     activeFilter === "incomeVsExpense" ||
     activeFilter === "turnoverVsSubbieExpense" ||
     activeFilter === "turnoverVsFuelPerTruck" ||
+    activeFilter === "truckIncomeVsExpense" ||
     activeFilter === "paymentsReceivedPerMonth"
   ) {
     return 1000;
@@ -62,179 +57,7 @@ export const CustomAxisTick = ({ x, y, payload }) => {
   );
 };
 
-export const getBarFill = (entry, activeFilter) => {
-  console.log("getBarFill entry:", entry);
-  if (activeFilter === "fuel" && entry && entry.status) {
-    console.log(`Applying color for status: ${entry.status}`);
-    switch (entry.status) {
-      case "good":
-        return "#4CAF50";
-      case "warning":
-        return "#FFC107";
-      case "bad":
-        return "#F44336";
-      default:
-        return "#4169E1";
-    }
-  } else if (activeFilter === "turnoverPerTruck" && entry && entry.status) {
-    console.log(`Applying color for turnover status: ${entry.status}`);
-    switch (entry.status) {
-      case "high":
-        return "#4CAF50";
-      case "medium":
-        return "#FFC107";
-      case "low":
-        return "#F44336";
-      default:
-        return "#4169E1";
-    }
-  } else if (
-    (activeFilter === "subcontractorVsTurnover" ||
-      activeFilter === "subcontractorTurnoverPerMonth" ||
-      activeFilter === "wagesVsExpenses" ||
-      activeFilter === "incomeVsExpense" ||
-      activeFilter === "turnoverVsSubbieExpense") &&
-    entry &&
-    entry.type
-  ) {
-    return entry.type === "total"
-      ? "#2196F3"
-      : entry.type === "subcontractor"
-        ? "#FF6347"
-        : entry.type === "income"
-          ? "#4169E1"
-          : entry.type === "expenses"
-            ? "#FF6347"
-            : "#4169E1";
-  } else if (activeFilter === "turnoverVsFuelPerTruck") {
-    return "#4169E1";
-  }
-  console.log("Falling back to default color");
-  return "#4169E1";
-};
-
-export const CustomBarLabelForTurnover = ({ x, y, width, value, payload = {} }) => {
-  console.log("CustomBarLabelForTurnover - payload:", payload);
-  return (
-    <text
-      x={x + width / 2}
-      y={y - 10}
-      fill="#000"
-      textAnchor="middle"
-      dominantBaseline="middle"
-      fontSize={12}
-    >
-      {`R${value?.toLocaleString() || 0}`}
-    </text>
-  );
-};
-
-export const CustomBarLabelForDieselCost = ({
-  x,
-  y,
-  width,
-  value,
-  payload = {},
-}) => {
-  console.log("CustomBarLabelForDieselCost - payload:", payload);
-  const percentage =
-    payload.fuelCostPercentage ?? payload.dieselCostPercentage ?? 0;
-  return (
-    <text
-      x={x + width / 2}
-      y={y - 10}
-      fill="#000"
-      textAnchor="middle"
-      dominantBaseline="middle"
-      fontSize={12}
-    >
-      {`R${value?.toLocaleString() || 0} (${percentage}%)`}
-    </text>
-  );
-};
-
-export const CustomBarLabelForFuelAndTurnover = ({ x, y, width, value, index, chartData }) => {
-  if (value === undefined || value === null) {
-    console.log(
-      "CustomBarLabelForFuelAndTurnover: Value is undefined or null, skipping label"
-    );
-    return null;
-  }
-  console.log(
-    `CustomBarLabelForFuelAndTurnover: index=${index}, chartData=`,
-    chartData
-  );
-  
-  // Handle case where chartData is undefined or index is out of bounds
-  const percentage = chartData && chartData[index] ? chartData[index].percentage || 0 : 0;
-  console.log(`Selected percentage: ${percentage}%`);
-  const labelText = `R${value.toLocaleString()} (${percentage}%)`;
-  return (
-    <text
-      x={x + width / 2}
-      y={y - 10}
-      fill="#000"
-      textAnchor="middle"
-      dominantBaseline="middle"
-      fontSize={12}
-    >
-      {labelText}
-    </text>
-  );
-};
-
-export const CustomBarLabelForDefault = ({ x, y, width, value }) => {
-  if (value === undefined || value === null) {
-    console.log(
-      "CustomBarLabelForDefault: Value is undefined or null, skipping label"
-    );
-    return null;
-  }
-  const labelText = `R${value.toLocaleString()}`;
-  return (
-    <text
-      x={x + width / 2}
-      y={y - 10}
-      fill="#000"
-      textAnchor="middle"
-      dominantBaseline="middle"
-      fontSize={12}
-    >
-      {labelText}
-    </text>
-  );
-};
-
-export const CustomBarLabelForPayments = (props) => {
-  const { x, y, width, value } = props;
-
-  if (value === undefined || value === null || isNaN(value)) {
-    return null;
-  }
-
-  const formatted = Number(value).toLocaleString("en-ZA", {
-    style: "currency",
-    currency: "ZAR",
-    minimumFractionDigits: 0,
-  });
-
-  const labelY = y - 10;
-
-  return (
-    <text
-      x={x + width / 2}
-      y={labelY}
-      fill="#333"
-      fontSize={12}
-      fontWeight="bold"
-      textAnchor="middle"
-    >
-      {formatted}
-    </text>
-  );
-};
-
-// Data Fetching Functions
+// Dropdown data
 export const fetchClients = async (setClients, setError) => {
   try {
     const response = await api.get("/api/get-clients");
@@ -301,554 +124,6 @@ export const fetchTrucks = async (setTrucks, setError) => {
   }
 };
 
-export const fetchFuelData = async (month, year, setIsLoading, setError) => {
-  setIsLoading(true);
-  setError(null);
-  try {
-    console.log(`Fetching fuel data for month: ${month}, year: ${year}`);
-    const response = await api.get("/api/fuel-expenses", {
-      params: { month, year, _t: new Date().getTime() },
-    });
-    console.log("API response:", response.data);
-    if (response.data.success) {
-      console.log("Fuel data received:", response.data.data);
-      const fuelExpenses = response.data.data.map((expense) => {
-        const cost = Number.parseFloat(expense.total_cost);
-        const status = calculateStatus(cost);
-        console.log(
-          `Truck ${expense.truckregnum}: Cost=${cost}, Status=${status}, Percentage=${expense.percentage}%`
-        );
-        return {
-          truckId: expense.truckregnum,
-          value: cost,
-          month: expense.month_name.trim(),
-          year: expense.year.toString(),
-          status: status,
-          percentage: expense.percentage,
-        };
-      });
-      console.log("Processed fuel expenses:", fuelExpenses);
-      return fuelExpenses;
-    } else {
-      throw new Error(response.data.message || "Failed to fetch data");
-    }
-  } catch (err) {
-    console.error(
-      "Error fetching fuel data:",
-      err.response ? err.response.data : err.message
-    );
-    setError(`Failed to fetch fuel data: ${err.message}`);
-    return [];
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-export const fetchTurnoverData = async (month, year, clientId, setIsLoading, setError, clients) => {
-  setIsLoading(true);
-  setError(null);
-  try {
-    console.log(
-      `Fetching turnover data for month: ${month}, year: ${year}, clientId: ${clientId}`
-    );
-    const response = await api.get("/api/turnover-per-month", {
-      params: {
-        month,
-        year,
-        clientId: clientId || undefined,
-        _t: new Date().getTime(),
-      },
-    });
-    console.log("API response:", response.data);
-    if (response.data.success) {
-      let turnoverData = response.data.data.map((item) => {
-        const turnover = Number.parseFloat(item.turnover);
-        console.log(
-          `Client ${item.client}: Turnover=${turnover}, Percentage=${item.percentage}%`
-        );
-        return {
-          name: item.client,
-          turnover: turnover,
-          month: item.month_name.trim(),
-          year: item.year,
-          percentage: item.percentage,
-        };
-      });
-      console.log("Processed turnover data before handling zero:", turnoverData);
-
-      // If a client is selected and only the total is present, add a zero entry for the client
-      if (clientId && turnoverData.length === 1 && turnoverData[0].name === "Total Turnover") {
-        const selectedClientName = clients.find((c) => c.m5clientkey === clientId)?.client || "";
-        if (selectedClientName) {
-          turnoverData.push({
-            name: selectedClientName,
-            turnover: 0,
-            month: month.trim(),
-            year: turnoverData[0].year || year,
-            percentage: 0,
-          });
-          console.log(`Added zero-turnover entry for client: ${selectedClientName}`);
-        }
-      }
-
-      console.log("Processed turnover data before sorting:", turnoverData);
-
-      turnoverData = turnoverData.sort((a, b) => {
-        if (a.name === "Total Turnover") return -1;
-        if (b.name === "Total Turnover") return 1;
-        if (
-          clientId &&
-          a.name === clients.find((c) => c.m5clientkey === clientId)?.client
-        )
-          return 1;
-        if (
-          clientId &&
-          b.name === clients.find((c) => c.m5clientkey === clientId)?.client
-        )
-          return -1;
-        return a.name.localeCompare(b.name);
-      });
-
-      console.log("Processed turnover data after sorting:", turnoverData);
-      return turnoverData;
-    } else {
-      throw new Error(response.data.message || "Failed to fetch data");
-    }
-  } catch (err) {
-    console.error("Error fetching turnover data:", err);
-    setError(err.message);
-    return [];
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-export const fetchAgingAnalysisData = async (month, year, clientId, setIsLoading, setError) => {
-  setIsLoading(true);
-  setError(null);
-  try {
-    console.log(
-      `Fetching aging analysis data for month: ${month}, year: ${year}, clientId: ${clientId}`
-    );
-    const response = await api.get("/api/aging-analysis", {
-      params: {
-        month,
-        year,
-        clientId: clientId || undefined,
-        _t: new Date().getTime(),
-      },
-    });
-    console.log("API response:", response.data);
-    if (response.data.success) {
-      console.log("Aging analysis data received:", response.data.data);
-      const agingData = response.data.data.map((item) => ({
-        name: item.client || "Total Aging",
-        current: Number(item.current) || 0,
-        thirtyDays: Number(item.thirtyDays) || 0,
-        sixtyDays: Number(item.sixtyDays) || 0,
-        ninetyDays: Number(item.ninetyDays) || 0,
-        month: item.month,
-        year: item.year,
-      }));
-      console.log("Processed aging analysis data:", agingData);
-      return agingData;
-    } else {
-      throw new Error(response.data.message || "Failed to fetch data");
-    }
-  } catch (err) {
-    console.error(
-      "Error fetching aging analysis data:",
-      err.response ? err.response.data : err.message
-    );
-    setError(`Failed to fetch aging analysis data: ${err.message}`);
-    return [];
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-export const fetchTurnoverVsDieselCost = async (month, year, setIsLoading, setError) => {
-  setIsLoading(true);
-  setError(null);
-  try {
-    const monthNames = [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
-    ];
-    const numericMonth = monthNames.indexOf(month) + 1;
-    console.log(
-      `Fetching turnover vs diesel cost for month: ${month} (numeric: ${numericMonth}), year: ${year}`
-    );
-    const response = await api.get("/api/turnover-vs-diesel-cost", {
-      params: { month: numericMonth, year, _t: new Date().getTime() },
-    });
-    if (response.data.success) {
-      const data = response.data.data.map((item) => {
-        console.log(
-          `Received percentages: turnoverPercentage=${item.turnoverPercentage
-          } (${typeof item.turnoverPercentage}), dieselCostPercentage=${item.dieselCostPercentage
-          } (${typeof item.dieselCostPercentage})`
-        );
-        return {
-          month: item.month,
-          year: item.year,
-          totalTurnover: Number(item.totalTurnover) || 0,
-          dieselCost: Number(item.dieselCost) || 0,
-        };
-      });
-      console.log("Processed turnover vs diesel cost data:", data);
-      return data;
-    } else {
-      throw new Error(response.data.message || "Failed to fetch data");
-    }
-  } catch (err) {
-    console.error("Error fetching turnover vs diesel cost:", err);
-    setError(err.message);
-    return [];
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-export const fetchIncomeVsExpenses = async (month, year, setIsLoading, setError) => {
-  setIsLoading(true);
-  setError(null);
-  try {
-    console.log(
-      `Fetching income (total turnover) vs expenses for month: ${month}, year: ${year}`
-    );
-
-    const turnoverResponse = await api.get("/api/turnover-per-month", {
-      params: { month, year, _t: new Date().getTime() },
-    });
-
-    const expensesResponse = await api.get("/api/all-expenses", {
-      params: { month, year, _t: new Date().getTime() },
-    });
-
-    if (!turnoverResponse.data.success) {
-      throw new Error(
-        turnoverResponse.data.message || "Failed to fetch turnover data"
-      );
-    }
-    if (!expensesResponse.data.success) {
-      throw new Error(
-        expensesResponse.data.message || "Failed to fetch expenses data"
-      );
-    }
-
-    const turnoverData = turnoverResponse.data.data.find(
-      (item) => item.client === "Total Turnover"
-    );
-    const income = turnoverData
-      ? Number.parseFloat(turnoverData.turnover) || 0
-      : 0;
-
-    const totalExpenses =
-      Number.parseFloat(
-        expensesResponse.data.data.expenses.reduce(
-          (sum, item) => sum + Number.parseFloat(item.total_cost || 0),
-          0
-        )
-      ) || 0;
-
-    const data = [
-      {
-        name: "Income",
-        value: income,
-        type: "income",
-        month: month,
-        year: year,
-      },
-      {
-        name: "Expenses",
-        value: totalExpenses,
-        type: "expenses",
-        month: month,
-        year: year,
-      },
-    ];
-
-    console.log("Processed income vs expenses data:", data);
-    return data;
-  } catch (err) {
-    console.error("Error fetching income vs expenses:", err);
-    setError(err.message);
-    return [];
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-export const fetchTurnoverPerTruck = async (month, year, setIsLoading, setError) => {
-  setIsLoading(true);
-  setError(null);
-  try {
-    console.log(
-      `Fetching turnover per truck for month: ${month}, year: ${year}`
-    );
-    const response = await api.get("/api/turnover-per-truck", {
-      params: { month, year, _t: new Date().getTime() },
-    });
-    console.log("API response:", response.data);
-    if (response.data.success) {
-      const turnoverData = response.data.data.map((item) => {
-        const turnover = Number.parseFloat(item.total_turnover);
-        const status = calculateTurnoverStatus(turnover);
-        return {
-          truckregnumber: item.truckregnumber,
-          total_turnover: turnover,
-          month: item.month_name.trim(),
-          year: item.year,
-          percentage: item.percentage,
-          status,
-        };
-      });
-      console.log("Processed turnover per truck data:", turnoverData);
-      return turnoverData;
-    } else {
-      throw new Error(response.data.message || "Failed to fetch data");
-    }
-  } catch (err) {
-    console.error("Error fetching turnover per truck:", err);
-    setError(err.message);
-    return [];
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-export const fetchWagesVsExpenses = async (month, year, setIsLoading, setError) => {
-  setIsLoading(true);
-  setError(null);
-  try {
-    console.log(
-      `Fetching wages vs expenses for month: ${month}, year: ${year}`
-    );
-    const response = await api.get("/api/wages-vs-expenses", {
-      params: { month, year, _t: new Date().getTime() },
-    });
-    console.log("API response:", response.data);
-    if (response.data.success) {
-      const data = response.data.data.map((item) => {
-        console.log(
-          `Received: name=${item.name}, value=${item.value}, type=${item.type}, percentage=${item.percentage}%`
-        );
-        return {
-          name: item.name,
-          value: Number(item.value) || 0,
-          type: item.type,
-          month: item.month,
-          year: item.year,
-        };
-      });
-      console.log("Processed wages vs expenses data:", data);
-      return data;
-    } else {
-      throw new Error(response.data.message || "Failed to fetch data");
-    }
-  } catch (err) {
-    console.error("Error fetching wages vs expenses:", err);
-    setError(err.message);
-    return [];
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-export const fetchSubcontractorTurnoverPerMonth = async (month, year, setIsLoading, setError) => {
-  setIsLoading(true);
-  setError(null);
-  try {
-    console.log(
-      `Fetching turnover vs total subcontractor for month: ${month}, year: ${year}`
-    );
-    const response = await api.get("/api/subcontractor-turnover-per-month", {
-      params: { month, year, _t: new Date().getTime() },
-    });
-    console.log("API response:", response.data);
-    if (response.data.success) {
-      const turnoverData = response.data.data.map((item) => {
-        const value = Number.parseFloat(item.value);
-        console.log(
-          `Name ${item.name}: Value=${value}, Type=${item.type}, Percentage=${item.percentage}%`
-        );
-        return {
-          name: item.name,
-          value: value,
-          type: item.type,
-          month: item.month.trim(),
-          year: item.year,
-        };
-      });
-      console.log(
-        "Processed turnover vs total subcontractor data:",
-        turnoverData
-      );
-      return turnoverData;
-    } else {
-      throw new Error(response.data.message || "Failed to fetch data");
-    }
-  } catch (err) {
-    console.error(
-      "Error fetching turnover vs total subcontractor data:",
-      err
-    );
-    setError(err.message);
-    return [];
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-export const fetchSubcontractorVsTurnover = async (
-  month,
-  year,
-  subcontractorId,
-  setIsLoading,
-  setError
-) => {
-  setIsLoading(true);
-  setError(null);
-  try {
-    console.log(
-      `Fetching subcontractor vs turnover for month: ${month}, year: ${year}, subcontractorId: ${subcontractorId}`
-    );
-    const response = await api.get("/api/subcontractor-vs-turnover", {
-      params: {
-        month,
-        year,
-        subcontractorId: subcontractorId || undefined,
-        _t: new Date().getTime(),
-      },
-    });
-    console.log("API response:", response.data);
-    if (response.data.success) {
-      const data = response.data.data.map((item) => {
-        console.log(
-          `Received: name=${item.name}, value=${item.value}, type=${item.type}, percentage=${item.percentage}%`
-        );
-        return {
-          name: item.name,
-          value: Number(item.value) || 0,
-          type: item.type,
-          month: item.month,
-          year: item.year,
-        };
-      });
-      console.log("Processed subcontractor vs turnover data:", data);
-      return data;
-    } else {
-      throw new Error(response.data.message || "Failed to fetch data");
-    }
-  } catch (err) {
-    console.error("Error fetching subcontractor vs turnover:", err);
-    setError(err.message);
-    return [];
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-export const fetchTurnoverVsSubbieExpense = async (
-  month,
-  year,
-  subcontractorId,
-  setIsLoading,
-  setError
-) => {
-  setIsLoading(true);
-  setError(null);
-  try {
-    console.log(
-      `Fetching turnover vs subbie expense for month: ${month}, year: ${year}, subcontractorId: ${subcontractorId}`
-    );
-    const response = await api.get("/api/turnover-vs-subbie-expense", {
-      params: {
-        month,
-        year,
-        subcontractorId: subcontractorId || undefined,
-        _t: new Date().getTime(),
-      },
-    });
-    console.log("API response:", response.data);
-    if (response.data.success) {
-      const data = response.data.data.map((item) => {
-        console.log(
-          `Received: name=${item.name}, value=${item.value}, type=${item.type}, percentage=${item.percentage}%`
-        );
-        return {
-          name: item.name,
-          value: Number(item.value) || 0,
-          type: item.type,
-          month: item.month,
-          year: item.year,
-        };
-      });
-      console.log("Processed turnover vs subbie expense data:", data);
-      return data;
-    } else {
-      throw new Error(response.data.message || "Failed to fetch data");
-    }
-  } catch (err) {
-    console.error("Error fetching turnover vs subbie expense:", err);
-    setError(err.message);
-    return [];
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-export const fetchTurnoverVsFuelPerTruck = async (month, year, truckId, setIsLoading, setError) => {
-  setIsLoading(true);
-  setError(null);
-  try {
-    console.log(
-      `Fetching turnover vs fuel per truck for month: ${month}, year: ${year}, truckId: ${truckId}`
-    );
-    const response = await api.get("/api/turnover-vs-fuel-per-truck", {
-      params: {
-        month,
-        year,
-        truckId: truckId || undefined,
-        _t: new Date().getTime(),
-      },
-    });
-    console.log("API response:", response.data);
-    if (response.data.success) {
-      const processedData = response.data.data.map((item) => ({
-        truckId: item.truckregnumber || item.truckregnum || 'Totals',
-        turnover: Number.parseFloat(item.total_turnover) || 0,
-        fuelCost: Number.parseFloat(item.total_fuel_cost) || 0,
-        month: item.month_name.trim(),
-        year: item.year,
-        turnoverPercentage: Number.parseFloat(item.turnoverPercentage) || 0,
-        fuelCostPercentage: Number.parseFloat(item.fuelCostPercentage) || 0,
-      }));
-      console.log("Processed turnover vs fuel per truck data:", processedData);
-      return processedData;
-    } else {
-      throw new Error(response.data.message || "Failed to fetch data");
-    }
-  } catch (err) {
-    console.error("Error fetching turnover vs fuel per truck:", err);
-    setError(err.message);
-    return [];
-  } finally {
-    setIsLoading(false);
-  }
-};
-
 export const fetchPaymentClients = async (month, year, setPaymentClients, setError) => {
   try {
     const response = await api.get("/api/payment-clients", {
@@ -864,50 +139,157 @@ export const fetchPaymentClients = async (month, year, setPaymentClients, setErr
   }
 };
 
-export const fetchPaymentsReceivedPerMonth = async (month, year, clientId, setIsLoading, setError) => {
+// Data fetching for the charts. Every analytics endpoint returns rows whose
+// values are categories ({ [key]: { ex, vat } }); these turn them into chart
+// rows { name, categories }.
+const fetchCategoryRows = async (endpoint, params, toName, setIsLoading, setError) => {
   setIsLoading(true);
+  setError(null);
   try {
-    const response = await api.get("/api/payments-received-per-month", {
-      params: {
-        month,
-        year,
-        clientId: clientId || undefined,
-        _t: new Date().getTime(),
-      },
+    const response = await api.get(endpoint, {
+      params: { ...params, _t: new Date().getTime() },
     });
-
-    if (response.data.success) {
-      let paymentsData = response.data.data.map((item) => {
-        const amount = Number(item.amount) || 0;
-
-        return {
-          name: item.name === "Total Payments"
-            ? "Total Payments"
-            : (item.client || item.name || "Unknown Client"),
-          payments: amount,
-          month: item.month?.trim() || month.trim(),
-          year: item.year.toString(),
-          percentage: Number(item.percentage) || 0,
-        };
-      });
-
-      // CRITICAL: Always show "Total Payments" first, then the selected client
-      paymentsData = paymentsData.sort((a, b) => {
-        if (a.name === "Total Payments") return -1;
-        if (b.name === "Total Payments") return 1;
-        return 0; // keep relative order (total first, client second)
-      });
-
-      console.log("Final sorted payments data:", paymentsData);
-      return paymentsData;
-    } else {
+    if (!response.data.success) {
       throw new Error(response.data.message || "Failed to fetch data");
     }
+    return response.data.data.map((item) => ({
+      name: toName(item),
+      categories: item.categories || {},
+    }));
   } catch (err) {
-    console.error("Error fetching payments received:", err);
-    setError(err.message || "Failed to load payments data");
+    console.error(`Error fetching ${endpoint}:`, err);
+    setError(err.message);
     return [];
   } finally {
     setIsLoading(false);
   }
 };
+
+const totalFirst = (totalName) => (rows) =>
+  [...rows].sort((a, b) => (a.name === totalName ? -1 : b.name === totalName ? 1 : 0));
+
+export const fetchFuelData = (month, year, setIsLoading, setError) =>
+  fetchCategoryRows("/api/fuel-expenses", { month, year }, (i) => i.truckregnum, setIsLoading, setError);
+
+export const fetchTurnoverData = (month, year, clientId, setIsLoading, setError) =>
+  fetchCategoryRows(
+    "/api/turnover-per-month",
+    { month, year, clientId: clientId || undefined },
+    (i) => i.client,
+    setIsLoading,
+    setError
+  ).then(totalFirst("Total Turnover"));
+
+export const fetchAgingAnalysisData = (month, year, clientId, setIsLoading, setError) =>
+  fetchCategoryRows(
+    "/api/aging-analysis",
+    { month, year, clientId: clientId || undefined },
+    (i) => i.client || "Total Aging",
+    setIsLoading,
+    setError
+  );
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+export const fetchTurnoverVsDieselCost = (month, year, setIsLoading, setError) =>
+  fetchCategoryRows(
+    "/api/turnover-vs-diesel-cost",
+    { month: MONTH_NAMES.indexOf(month) + 1, year },
+    (i) => i.month,
+    setIsLoading,
+    setError
+  );
+
+// Income is the month's total turnover; expenses are the expense categories.
+export const fetchIncomeVsExpenses = async (month, year, setIsLoading, setError) => {
+  setIsLoading(true);
+  setError(null);
+  try {
+    const params = { month, year, _t: new Date().getTime() };
+    const [turnoverResponse, expensesResponse] = await Promise.all([
+      api.get("/api/turnover-per-month", { params }),
+      api.get("/api/all-expenses", { params }),
+    ]);
+    if (!turnoverResponse.data.success) {
+      throw new Error(turnoverResponse.data.message || "Failed to fetch turnover data");
+    }
+    if (!expensesResponse.data.success) {
+      throw new Error(expensesResponse.data.message || "Failed to fetch expenses data");
+    }
+    const total = turnoverResponse.data.data.find((item) => item.client === "Total Turnover");
+    const expenses = expensesResponse.data.data.expenses[0];
+    return [
+      { name: "Income", categories: total?.categories || {} },
+      { name: "Expenses", categories: expenses?.categories || {} },
+    ];
+  } catch (err) {
+    console.error("Error fetching income vs expenses:", err);
+    setError(err.message);
+    return [];
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+export const fetchTurnoverPerTruck = (month, year, setIsLoading, setError) =>
+  fetchCategoryRows("/api/turnover-per-truck", { month, year }, (i) => i.truckregnumber, setIsLoading, setError);
+
+export const fetchWagesVsExpenses = (month, year, setIsLoading, setError) =>
+  fetchCategoryRows("/api/wages-vs-expenses", { month, year }, (i) => i.name, setIsLoading, setError);
+
+export const fetchSubcontractorTurnoverPerMonth = (month, year, setIsLoading, setError) =>
+  fetchCategoryRows(
+    "/api/subcontractor-turnover-per-month",
+    { month, year },
+    (i) => i.name,
+    setIsLoading,
+    setError
+  );
+
+export const fetchSubcontractorVsTurnover = (month, year, subcontractorId, setIsLoading, setError) =>
+  fetchCategoryRows(
+    "/api/subcontractor-vs-turnover",
+    { month, year, subcontractorId: subcontractorId || undefined },
+    (i) => i.name,
+    setIsLoading,
+    setError
+  );
+
+export const fetchTurnoverVsSubbieExpense = (month, year, subcontractorId, setIsLoading, setError) =>
+  fetchCategoryRows(
+    "/api/turnover-vs-subbie-expense",
+    { month, year, subcontractorId: subcontractorId || undefined },
+    (i) => i.name,
+    setIsLoading,
+    setError
+  );
+
+export const fetchTurnoverVsFuelPerTruck = (month, year, truckId, setIsLoading, setError) =>
+  fetchCategoryRows(
+    "/api/turnover-vs-fuel-per-truck",
+    { month, year, truckId: truckId || undefined },
+    (i) => i.truckregnumber,
+    setIsLoading,
+    setError
+  );
+
+export const fetchTruckIncomeVsExpense = (month, year, truckId, setIsLoading, setError) =>
+  fetchCategoryRows(
+    "/api/truck-income-vs-expense",
+    { month, year, truckId: truckId || undefined },
+    (i) => i.truckregnumber || "Unassigned / Workshop",
+    setIsLoading,
+    setError
+  );
+
+export const fetchPaymentsReceivedPerMonth = (month, year, clientId, setIsLoading, setError) =>
+  fetchCategoryRows(
+    "/api/payments-received-per-month",
+    { month, year, clientId: clientId || undefined },
+    (i) => i.name,
+    setIsLoading,
+    setError
+  ).then(totalFirst("Total Payments"));

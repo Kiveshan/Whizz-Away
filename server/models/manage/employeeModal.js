@@ -3,6 +3,14 @@ import bcrypt from "bcrypt"
 import { validatePassword } from "../../utils/passwordValidator.js"
 import { logPasswordChange, logEmployeeCreation } from "../../utils/auditLogger.js"
 
+// An empty salary field arrives as "", which parseFloat turns into NaN, and
+// Postgres stores NaN happily in float8 and numeric alike. Treat blank and
+// unparseable input as "no salary" instead.
+const toAmount = (value) => {
+  const n = Number.parseFloat(value)
+  return Number.isFinite(n) ? n : null
+}
+
 const getEmployeeBasic = async (id) => {
   let client
   try {
@@ -174,6 +182,7 @@ const createEmployee = async (employeeData, documentUrls, adminId = null, userAg
       deduction_loan,
       deduction_damage,
     } = employeeData
+    const baseSalary = toAmount(base_salary)
 
     if (!name || !surname) {
       throw new Error("Name and surname are required")
@@ -209,7 +218,7 @@ const createEmployee = async (employeeData, documentUrls, adminId = null, userAg
       roleid || null,
       email || null,
       hashedPassword,
-      base_salary != null ? Number.parseFloat(base_salary) : null,
+      baseSalary,
       company_reg_num || null,
       documentUrls[0] || null,
       documentUrls[1] || null,
@@ -218,14 +227,14 @@ const createEmployee = async (employeeData, documentUrls, adminId = null, userAg
     const result = await client.query(insertEmployeeQuery, insertValues)
     const newEmployee = result.rows[0]
 
-    if (base_salary != null) {
+    if (baseSalary != null) {
       const insertSalaryHistoryQuery = `
         INSERT INTO base_salary_history (userid, base, date)
         VALUES ($1, $2, $3)
       `
       const salaryHistoryValues = [
         newEmployee.userid,
-        Number.parseFloat(base_salary),
+        baseSalary,
         deductionDate,
       ]
       await client.query(insertSalaryHistoryQuery, salaryHistoryValues)
@@ -295,6 +304,7 @@ const updateEmployee = async (id, employeeData, documentUrls, adminId = null, us
       deduction_loan,
       deduction_damage,
     } = employeeData
+    const baseSalary = toAmount(base_salary)
 
     if (!name || !surname) {
       throw new Error("Name and surname are required")
@@ -355,7 +365,7 @@ const updateEmployee = async (id, employeeData, documentUrls, adminId = null, us
       roleid || null,
       email || null,
       hashedPassword,
-      base_salary != null ? Number.parseFloat(base_salary) : null,
+      baseSalary,
       document_url1 || null,
       document_url2 || null,
       document_url3 || null,
@@ -364,7 +374,7 @@ const updateEmployee = async (id, employeeData, documentUrls, adminId = null, us
     const result = await client.query(updateEmpQuery, updateValues)
     const updatedEmployee = result.rows[0]
 
-    if (base_salary != null && Number.parseFloat(base_salary) !== Number.parseFloat(currentBaseSalary)) {
+    if (baseSalary != null && baseSalary !== toAmount(currentBaseSalary)) {
       const currentDate = new Date()
       const dateTruncated = currentDate.toISOString().split('T')[0]
 
@@ -383,7 +393,7 @@ const updateEmployee = async (id, employeeData, documentUrls, adminId = null, us
           WHERE id = $2
         `
         const updateSalaryHistoryValues = [
-          Number.parseFloat(base_salary),
+          baseSalary,
           checkResult.rows[0].id
         ]
         await client.query(updateSalaryHistoryQuery, updateSalaryHistoryValues)
@@ -394,7 +404,7 @@ const updateEmployee = async (id, employeeData, documentUrls, adminId = null, us
         `
         const salaryHistoryValues = [
           updatedEmployee.userid,
-          Number.parseFloat(base_salary),
+          baseSalary,
           currentDate,
         ]
         await client.query(insertSalaryHistoryQuery, salaryHistoryValues)
