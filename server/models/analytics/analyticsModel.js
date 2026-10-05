@@ -453,11 +453,14 @@ const getTurnoverVsDieselCost = async (numericMonth, year) => {
 // $3 = m5truckskey (only when truckFilter is supplied).
 //
 // How a job's value is split across trucks (all four rules applied here):
-//   1. Container-weighted: each leg is worth total_cost / num_legs, and that leg
-//      value is shared between its trucks in proportion to how many containers
-//      each truck moved on the leg (a truck that moved 8 of 9 gets 8/9), instead
-//      of an equal per-truck split. Legs with no container recorded fall back to
-//      an equal split across the trucks on that leg.
+//   1. Weighted by the work each truck did across the whole job. A leg is a
+//      route (A -> B) carrying only some of the job's containers, and legs vary
+//      widely in size (e.g. 20, 10, 15, 25), so legs are NOT worth an equal
+//      slice. A truck gets value * its work / the job's total work, where work is:
+//        - container jobs: containers moved (each container on each leg is one
+//          move); a truck on a leg with no container numbers counts as one move.
+//        - jobs with no container numbers (break bulk, billed per ton): tons
+//          carried (legs_m2.vgm), or the number of loads if no tonnage is recorded.
 //   2. VAT treated the same for every job: regular jobs use total_cost (already
 //      ex-VAT); add-on jobs (shipment_type 5) use the add-on amount with VAT
 //      removed when vat_applied, so add-on trucks aren't overstated by 15%.
@@ -467,34 +470,49 @@ const getTurnoverVsDieselCost = async (numericMonth, year) => {
 const SA_VAT_DIVISOR = "1.15"
 const truckIncomeCTE = (truckFilter = "") => `
     AssignedLegs AS (
-      SELECT DISTINCT l.m1key, l.legnumber, l.truckregnumber, l.containernumber, l.date AS leg_date
+      SELECT DISTINCT
+        l.m1key,
+        l.legnumber,
+        l.truckregnumber,
+        NULLIF(TRIM(l.containernumber), '') AS containernumber,
+        l.vgm,
+        l.date AS leg_date
       FROM legs_m2 l
       WHERE l.truckregnumber IS NOT NULL
         AND TRIM(l.truckregnumber) <> ''
     ),
-    LegsPerJob AS (
-      SELECT m1key, COUNT(DISTINCT legnumber) AS num_legs
-      FROM AssignedLegs
-      GROUP BY m1key
-    ),
-    ContainersPerLeg AS (
-      SELECT
-        m1key,
-        legnumber,
-        COUNT(DISTINCT containernumber) AS containers_on_leg,
-        COUNT(DISTINCT truckregnumber) AS trucks_on_leg
-      FROM AssignedLegs
-      GROUP BY m1key, legnumber
-    ),
-    TruckLeg AS (
+    TruckLegRaw AS (
       SELECT
         m1key,
         legnumber,
         truckregnumber,
-        COUNT(DISTINCT containernumber) AS containers_by_truck,
+        COUNT(DISTINCT containernumber) AS containers,
+        COALESCE(SUM(vgm) FILTER (WHERE containernumber IS NULL), 0) AS tons,
+        COUNT(*) FILTER (WHERE containernumber IS NULL) AS loads,
         MIN(leg_date) AS leg_date
       FROM AssignedLegs
       GROUP BY m1key, legnumber, truckregnumber
+    ),
+    JobBasis AS (
+      SELECT m1key, SUM(containers) AS job_containers, SUM(tons) AS job_tons
+      FROM TruckLegRaw
+      GROUP BY m1key
+    ),
+    TruckLeg AS (
+      SELECT
+        r.m1key,
+        r.truckregnumber,
+        r.leg_date,
+        (CASE WHEN jb.job_containers > 0 THEN GREATEST(r.containers, 1)
+              WHEN jb.job_tons > 0 THEN r.tons
+              ELSE r.loads END)::numeric AS work
+      FROM TruckLegRaw r
+      JOIN JobBasis jb ON r.m1key = jb.m1key
+    ),
+    WorkPerJob AS (
+      SELECT m1key, SUM(work) AS job_work
+      FROM TruckLeg
+      GROUP BY m1key
     ),
     IncomePerTruck AS (
       SELECT
@@ -504,16 +522,12 @@ const truckIncomeCTE = (truckFilter = "") => `
                 THEN COALESCE(ao.amount, 0)
                      / (CASE WHEN COALESCE(ao.vat_applied, true) THEN ${SA_VAT_DIVISOR} ELSE 1 END)
                 ELSE COALESCE(m.total_cost, 0) END)
-          / NULLIF(lpj.num_legs, 0)
-          * (CASE WHEN cpl.containers_on_leg > 0
-                  THEN tl.containers_by_truck::numeric / cpl.containers_on_leg
-                  ELSE 1.0 / NULLIF(cpl.trucks_on_leg, 0) END)
+          * tl.work / NULLIF(wpj.job_work, 0)
         ) AS total_income
       FROM TruckLeg tl
       JOIN m1_controller m ON tl.m1key = m.m1key
       LEFT JOIN add_ons ao ON m.addon_id = ao.addon_id
-      JOIN LegsPerJob lpj ON tl.m1key = lpj.m1key
-      JOIN ContainersPerLeg cpl ON tl.m1key = cpl.m1key AND tl.legnumber = cpl.legnumber
+      JOIN WorkPerJob wpj ON tl.m1key = wpj.m1key
       JOIN m5_trucks t ON tl.truckregnumber = t.truckregnum
       WHERE t.is_subcontractor = false
         AND t.status = true
