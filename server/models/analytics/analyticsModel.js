@@ -72,6 +72,7 @@ const getFuelExpenses = async (client, month, year) => {
   })
 }
 
+// Turnover = invoices (VAT-inclusive) + add-ons - credit notes (VAT-inclusive).
 const calculateMonthlyTurnover = async (client, dateFrom, dateTo, clientId = null) => {
   // --- Invoice portion (VAT-inclusive per instruction) ---
   const invoiceParams = [dateFrom, dateTo]
@@ -110,15 +111,42 @@ const calculateMonthlyTurnover = async (client, dateFrom, dateTo, clientId = nul
       ${addOnFilter}
   `
 
-  const [invoiceResult, addOnResult] = await Promise.all([
+  // --- Credit notes portion (deducted) ---
+  // credit_notes.amount holds VAT-exclusive line amounts; add the instruction's
+  // VAT so the deduction is on the same VAT-inclusive basis as the invoices
+  // (the same gross the statements use). Dated by creditnote_date.
+  const creditParams = [dateFrom, dateTo]
+  let creditFilter = ''
+  if (clientId) {
+    creditFilter = 'AND cn.client_id = $3'
+    creditParams.push(clientId)
+  }
+
+  const creditQuery = `
+    SELECT COALESCE(SUM(per_note.gross), 0) AS credit_notes
+    FROM (
+      SELECT SUM(amt.amount)::numeric * (1 + COALESCE(m.vat, 0)::numeric / 100) AS gross
+      FROM credit_notes cn
+      CROSS JOIN LATERAL unnest(cn.amount) AS amt(amount)
+      LEFT JOIN m1_controller m ON m.m1key = cn.m1key
+      WHERE cn.creditnote_date >= $1
+        AND cn.creditnote_date < $2
+        ${creditFilter}
+      GROUP BY cn.creditnote_id, m.vat
+    ) per_note
+  `
+
+  const [invoiceResult, addOnResult, creditResult] = await Promise.all([
     client.query(invoiceQuery, invoiceParams),
     client.query(addOnQuery, addOnParams),
+    client.query(creditQuery, creditParams),
   ])
 
   const invoiceTurnover = Number(invoiceResult.rows[0]?.invoice_turnover || 0)
   const addonTurnover = Number(addOnResult.rows[0]?.addon_turnover || 0)
+  const creditNotes = Number(creditResult.rows[0]?.credit_notes || 0)
 
-  return invoiceTurnover + addonTurnover
+  return invoiceTurnover + addonTurnover - creditNotes
 }
 
 const getTurnoverPerMonth = async (client, month, year, clientId = null) => {
@@ -464,6 +492,14 @@ const getTurnoverVsDieselCost = async (numericMonth, year) => {
 //   3. Bucketed by the leg date (when the work was done), not the capture date.
 //   4. Unassigned legs (no truck) are excluded, so the full job value is credited
 //      to the trucks that actually did the work rather than leaking away.
+//   5. Credit notes are deducted. Each credit_notes line is for one container
+//      (amount[i] ↔ containerids[i], ex-VAT, so it matches the ex-VAT turnover).
+//      The line comes off the trucks that moved that container on the job: split
+//      equally across the legs the container was on, then equally between the
+//      trucks that carried it on each leg, in the month of that leg (the work
+//      it reverses). A line whose container is on no assigned leg is spread over
+//      the job's trucks in the same shares as the job's turnover, so no credit
+//      is dropped.
 const SA_VAT_DIVISOR = "1.15"
 const truckIncomeCTE = (truckFilter = "") => `
     AssignedLegs AS (
@@ -496,31 +532,111 @@ const truckIncomeCTE = (truckFilter = "") => `
       FROM AssignedLegs
       GROUP BY m1key, legnumber, truckregnumber
     ),
-    IncomePerTruck AS (
+    TruckLegShare AS (
+      -- Fraction of the job's value each truck-leg earns; sums to 1 per job.
       SELECT
+        tl.m1key,
         tl.truckregnumber,
-        SUM(
-          (CASE WHEN m.shipment_type = 5
-                THEN COALESCE(ao.amount, 0)
-                     / (CASE WHEN COALESCE(ao.vat_applied, true) THEN ${SA_VAT_DIVISOR} ELSE 1 END)
-                ELSE COALESCE(m.total_cost, 0) END)
-          / NULLIF(lpj.num_legs, 0)
+        tl.leg_date,
+        (1.0 / NULLIF(lpj.num_legs, 0))
           * (CASE WHEN cpl.containers_on_leg > 0
                   THEN tl.containers_by_truck::numeric / cpl.containers_on_leg
-                  ELSE 1.0 / NULLIF(cpl.trucks_on_leg, 0) END)
-        ) AS total_income
+                  ELSE 1.0 / NULLIF(cpl.trucks_on_leg, 0) END) AS share
       FROM TruckLeg tl
-      JOIN m1_controller m ON tl.m1key = m.m1key
-      LEFT JOIN add_ons ao ON m.addon_id = ao.addon_id
       JOIN LegsPerJob lpj ON tl.m1key = lpj.m1key
       JOIN ContainersPerLeg cpl ON tl.m1key = cpl.m1key AND tl.legnumber = cpl.legnumber
-      JOIN m5_trucks t ON tl.truckregnumber = t.truckregnum
+    ),
+    JobValue AS (
+      SELECT
+        m.m1key,
+        CASE WHEN m.shipment_type = 5
+             THEN COALESCE(ao.amount, 0)
+                  / (CASE WHEN COALESCE(ao.vat_applied, true) THEN ${SA_VAT_DIVISOR} ELSE 1 END)
+             ELSE COALESCE(m.total_cost, 0) END AS job_value
+      FROM m1_controller m
+      LEFT JOIN add_ons ao ON m.addon_id = ao.addon_id
+    ),
+    CreditLines AS (
+      SELECT
+        cn.creditnote_id,
+        u.ord,
+        cn.m1key,
+        u.amount,
+        UPPER(TRIM(c.containernum)) AS containernum
+      FROM credit_notes cn
+      CROSS JOIN LATERAL unnest(cn.amount, cn.containerids) WITH ORDINALITY AS u(amount, containerid, ord)
+      LEFT JOIN container c ON c.containerkey = u.containerid
+      WHERE cn.m1key IS NOT NULL
+        AND u.amount IS NOT NULL
+    ),
+    CreditMoves AS (
+      -- Every leg/truck that moved the credited container on that job.
+      SELECT
+        cl.creditnote_id,
+        cl.ord,
+        al.legnumber,
+        al.truckregnumber,
+        MIN(al.leg_date) AS leg_date,
+        MAX(cl.amount) AS amount
+      FROM CreditLines cl
+      JOIN AssignedLegs al
+        ON al.m1key = cl.m1key
+        AND UPPER(TRIM(al.containernumber)) = cl.containernum
+      GROUP BY cl.creditnote_id, cl.ord, al.legnumber, al.truckregnumber
+    ),
+    CreditMoveCounts AS (
+      SELECT
+        creditnote_id,
+        ord,
+        legnumber,
+        -- one row per leg after the GROUP BY, so this counts the line's legs
+        COUNT(*) OVER (PARTITION BY creditnote_id, ord) AS legs_for_line,
+        COUNT(*) AS trucks_on_leg_for_line
+      FROM CreditMoves
+      GROUP BY creditnote_id, ord, legnumber
+    ),
+    CreditAlloc AS (
+      SELECT
+        cm.truckregnumber,
+        cm.leg_date,
+        cm.amount / cmc.legs_for_line / cmc.trucks_on_leg_for_line AS credit
+      FROM CreditMoves cm
+      JOIN CreditMoveCounts cmc
+        ON cmc.creditnote_id = cm.creditnote_id
+        AND cmc.ord = cm.ord
+        AND cmc.legnumber = cm.legnumber
+      UNION ALL
+      SELECT
+        s.truckregnumber,
+        s.leg_date,
+        cl.amount * s.share AS credit
+      FROM CreditLines cl
+      JOIN TruckLegShare s ON s.m1key = cl.m1key
+      WHERE NOT EXISTS (
+        SELECT 1 FROM CreditMoves cm
+        WHERE cm.creditnote_id = cl.creditnote_id AND cm.ord = cl.ord
+      )
+    ),
+    TruckContributions AS (
+      SELECT s.truckregnumber, s.leg_date, jv.job_value * s.share AS amount
+      FROM TruckLegShare s
+      JOIN JobValue jv ON jv.m1key = s.m1key
+      UNION ALL
+      SELECT truckregnumber, leg_date, -credit AS amount
+      FROM CreditAlloc
+    ),
+    IncomePerTruck AS (
+      SELECT
+        tc.truckregnumber,
+        SUM(tc.amount) AS total_income
+      FROM TruckContributions tc
+      JOIN m5_trucks t ON tc.truckregnumber = t.truckregnum
       WHERE t.is_subcontractor = false
         AND t.status = true
-        AND TRIM(TO_CHAR(tl.leg_date, 'Month')) = $1
-        AND EXTRACT(YEAR FROM tl.leg_date)::TEXT = $2
+        AND TRIM(TO_CHAR(tc.leg_date, 'Month')) = $1
+        AND EXTRACT(YEAR FROM tc.leg_date)::TEXT = $2
         ${truckFilter}
-      GROUP BY tl.truckregnumber
+      GROUP BY tc.truckregnumber
     )`
 
 const getTurnoverPerTruck = async (client, month, year) => {
@@ -1041,53 +1157,34 @@ const getAllExpenses = async (client, month, year) => {
     GROUP BY to_char(i.date, 'Month'), EXTRACT(YEAR FROM i.date)
   `
 
-  const creditNotesQuery = `
-    SELECT 
-      COALESCE(SUM(amount_value), 0) as total_credit_notes,
-      month_name,
-      year
-    FROM (
-      SELECT 
-        unnest(cn.amount) as amount_value,
-        to_char(cn.creditnote_date, 'Month') as month_name,
-        EXTRACT(YEAR FROM cn.creditnote_date) as year
-      FROM credit_notes cn
-      WHERE TRIM(to_char(cn.creditnote_date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM cn.creditnote_date)::text = $2
-    ) subquery
-    GROUP BY month_name, year
-  `
-
-  const [fuelResult, purchaseOrderResult, subcontractorResult, incomeResult, creditNotesResult] =
+  const [fuelResult, purchaseOrderResult, subcontractorResult, incomeResult] =
     await Promise.all([
       client.query(fuelQuery, [month, year]),
       client.query(purchaseOrderQuery, [month, year]),
       client.query(subcontractorQuery, [month, year]),
       client.query(incomeQuery, [month, year]),
-      client.query(creditNotesQuery, [month, year]),
     ])
 
   console.log("Fuel query result:", fuelResult.rows)
   console.log("Purchase order query result:", purchaseOrderResult.rows)
   console.log("Subcontractor expense query result:", subcontractorResult.rows)
   console.log("Income query result:", incomeResult.rows)
-  console.log("Credit notes query result:", creditNotesResult.rows)
 
   const totalFuelCost = Number.parseFloat(fuelResult.rows[0]?.total_fuel_cost || 0)
   const totalPurchaseOrderCost = Number.parseFloat(purchaseOrderResult.rows[0]?.total_po_cost || 0)
   const totalSubcontractorExpense = Number.parseFloat(subcontractorResult.rows[0]?.total_subcontractor_expense || 0)
   const totalWages = await getTotalWagesForMonth(client, month, year)
   const totalIncome = Number.parseFloat(incomeResult.rows[0]?.total_income || 0)
-  const totalCreditNotes = Number.parseFloat(creditNotesResult.rows[0]?.total_credit_notes || 0)
 
+  // Credit notes are not an expense here: they are already deducted from
+  // turnover (calculateMonthlyTurnover), the income side of Income vs Expense.
   const totalExpenses =
-    totalFuelCost + totalPurchaseOrderCost + totalSubcontractorExpense + totalWages + totalCreditNotes
+    totalFuelCost + totalPurchaseOrderCost + totalSubcontractorExpense + totalWages
 
   console.log(`Total fuel cost for ${month} ${year}: ${totalFuelCost}`)
   console.log(`Total purchase order cost for ${month} ${year}: ${totalPurchaseOrderCost}`)
   console.log(`Total subcontractor expense for ${month} ${year}: ${totalSubcontractorExpense}`)
   console.log(`Total wages for ${month} ${year}: ${totalWages}`)
-  console.log(`Total credit notes for ${month} ${year}: ${totalCreditNotes}`)
   console.log(`Total expenses for ${month} ${year}: ${totalExpenses}`)
   console.log(`Total income for ${month} ${year}: ${totalIncome}`)
 
