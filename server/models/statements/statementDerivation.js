@@ -71,7 +71,8 @@ const CREDIT_NOTES_GROSS = `
     cn.creditnote_date,
     cn.doc_no,
     cn.description,
-    ROUND((SUM(amt.amount)::numeric * (1 + COALESCE(m1.vat, 0)::numeric / 100)), 2) AS gross
+    ROUND((SUM(amt.amount)::numeric * (1 + COALESCE(m1.vat, 0)::numeric / 100)), 2) AS gross,
+    SUM(amt.amount)::numeric AS net
   FROM credit_notes cn
   CROSS JOIN LATERAL unnest(cn.amount) AS amt(amount)
   LEFT JOIN m1_controller m1 ON m1.m1key = cn.m1key
@@ -108,7 +109,8 @@ const ITEMS_AS_AT = `
     i.clientid                              AS client_id,
     ROUND((m1.total_cost * (1 + COALESCE(m1.vat, 0)::numeric / 100))::numeric, 2) AS gross,
     COALESCE(pd.paid, 0) + COALESCE(cr.credited, 0) AS settled,
-    ($2::date - i.date)                     AS age_days
+    ($2::date - i.date)                     AS age_days,
+    1 + COALESCE(m1.vat, 0)::numeric / 100  AS vat_factor
   FROM invoice i
   JOIN m1_controller m1 ON m1.m1key = i.m1key
   LEFT JOIN paid pd
@@ -124,7 +126,8 @@ const ITEMS_AS_AT = `
     a.client_id,
     ROUND(a.amount::numeric, 2),
     COALESCE(pd.paid, 0),
-    ($2::date - a.date)
+    ($2::date - a.date),
+    CASE WHEN COALESCE(a.vat_applied, true) THEN 1.15 ELSE 1 END
   FROM add_ons a
   LEFT JOIN paid pd
     ON pd.clientid = a.client_id AND pd.item_type = 'Add-on' AND pd.item_id = a.addon_id
@@ -137,7 +140,7 @@ const ITEMS_AS_AT = `
 // at that date. They still reduce what the client owes; ageOpenItems() applies
 // them to the oldest debt.
 const UNALLOCATED_CREDITS_AS_AT = `
-  SELECT cn.client_id, SUM(cn.gross) AS credit
+  SELECT cn.client_id, SUM(cn.gross) AS credit, SUM(cn.net) AS credit_ex
   FROM (${CREDIT_NOTES_GROSS}) cn
   WHERE ($1::int IS NULL OR cn.client_id = $1::int)
     AND cn.creditnote_date <= $2::date
@@ -190,24 +193,38 @@ const ageOpenItems = (items, unallocatedCredit = 0) => {
   return { total, buckets };
 };
 
+// With { exVat: true } items are aged on their VAT-exclusive values: each
+// item's gross and what settled it divided by that item's VAT factor (payments
+// and credits against an item carry its rate), and unallocated credits at
+// their net. Statements always use the default, VAT-inclusive, figures.
+const itemsFor = (rows, exVat) =>
+  exVat
+    ? rows.map((row) => ({
+        ...row,
+        gross: Number(row.gross) / Number(row.vat_factor || 1),
+        settled: Number(row.settled) / Number(row.vat_factor || 1),
+      }))
+    : rows;
+const creditFor = (row, exVat) => (exVat ? row?.credit_ex : row?.credit);
+
 /**
  * Outstanding and aging as at a date for every client at once — two queries
  * regardless of client count. Returns Map<clientId, { total, buckets }>; a
  * client with nothing on the books is simply absent.
  */
-const agingForAllClients = async (db, asAt) => {
+const agingForAllClients = async (db, asAt, { exVat = false } = {}) => {
   const [items, credits] = await Promise.all([
     db.query(ITEMS_AS_AT, [null, asAt]),
     db.query(UNALLOCATED_CREDITS_AS_AT, [null, asAt]),
   ]);
 
   const itemsByClient = new Map();
-  for (const row of items.rows) {
+  for (const row of itemsFor(items.rows, exVat)) {
     if (!itemsByClient.has(row.client_id)) itemsByClient.set(row.client_id, []);
     itemsByClient.get(row.client_id).push(row);
   }
   const creditByClient = new Map(
-    credits.rows.map((row) => [row.client_id, row.credit])
+    credits.rows.map((row) => [row.client_id, creditFor(row, exVat)])
   );
 
   const result = new Map();
@@ -232,12 +249,12 @@ const dayBefore = (isoDate) => {
 };
 
 /** Outstanding, and its aging buckets, for one client as at a date. */
-const outstandingAsAt = async (db, clientId, asAt) => {
+const outstandingAsAt = async (db, clientId, asAt, { exVat = false } = {}) => {
   const [items, credits] = await Promise.all([
     db.query(ITEMS_AS_AT, [clientId, asAt]),
     db.query(UNALLOCATED_CREDITS_AS_AT, [clientId, asAt]),
   ]);
-  return ageOpenItems(items.rows, credits.rows[0]?.credit);
+  return ageOpenItems(itemsFor(items.rows, exVat), creditFor(credits.rows[0], exVat));
 };
 
 /** Every month in which this client invoiced, paid, or was credited. */

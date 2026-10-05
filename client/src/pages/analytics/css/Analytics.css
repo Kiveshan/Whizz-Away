@@ -502,3 +502,71 @@ body.no-vertical-scroll {
     font-size: 0.9rem;
   }
 }
+/* Chart title with the per-chart VAT toggle beside it */
+.analytics-page-wrapper .chart-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.analytics-page-wrapper .chart-title-row .chart-title {
+  margin-bottom: 0;
+}
+
+.analytics-page-wrapper .vat-toggle {
+  display: inline-flex;
+  border: 1px solid #4169e1;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.analytics-page-wrapper .vat-toggle button {
+  background-color: #fff;
+  color: #4169e1;
+  border: none;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.analytics-page-wrapper .vat-toggle button + button {
+  border-left: 1px solid #4169e1;
+}
+
+.analytics-page-wrapper .vat-toggle button.active {
+  background-color: #4169e1;
+  color: #fff;
+}
+
+.analytics-page-wrapper .vat-toggle button:focus-visible {
+  outline: 2px solid #1a228b;
+  outline-offset: -2px;
+}
+
+/* Category breakdown in chart tooltips */
+.analytics-page-wrapper .tooltip-vat {
+  font-weight: normal;
+  color: #777;
+  font-size: 12px;
+}
+
+.analytics-page-wrapper .tooltip-stack + .tooltip-stack {
+  margin-top: 6px;
+}
+
+.analytics-page-wrapper .tooltip-stack-total {
+  font-weight: bold;
+}
+
+.analytics-page-wrapper .chart-summary {
+  text-align: center;
+  margin-top: 8px;
+  font-weight: bold;
+  color: #333;
+  flex-shrink: 0;
+}
