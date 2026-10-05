@@ -6,6 +6,7 @@ import { useNavigate, useLocation } from "react-router-dom"
 import "../../css/InstructionsList.css"
 import api from "../../../../api"
 import Pagination from "../../../../components/Pagination"
+import { useInstructionSearch } from "../../../../hooks/useInstructionSearch"
 
 // Bell icon component with shake animation using SVG
 const BellIcon = () => {
@@ -95,17 +96,21 @@ const CompanyInstructions = () => {
     return new Date().getFullYear().toString()
   }
 
-  // Clear month/year filters when arriving with a container search so all matching instructions are visible
-  const [selectedMonth, setSelectedMonth] = useState(location.state?.containerSearch ? "" : getCurrentMonthName())
-  const [selectedYear, setSelectedYear] = useState(location.state?.containerSearch ? "" : getCurrentYear())
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthName())
+  const [selectedYear, setSelectedYear] = useState(getCurrentYear())
   const [instructions, setInstructions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeFilter, setActiveFilter] = useState(initialFilter || "All")
-  const [containerSearch, setContainerSearch] = useState(location.state?.containerSearch || "")
-  const [debouncedSearch, setDebouncedSearch] = useState(location.state?.containerSearch || "")
-  const [containerSearchLoading, setContainerSearchLoading] = useState(false)
-  const [searchMatchedKeys, setSearchMatchedKeys] = useState(null)
+  const {
+    query: containerSearch,
+    setQuery: setContainerSearch,
+    isSearching,
+    matchedKeys,
+    loading: containerSearchLoading,
+    error: searchError,
+    retry: retrySearch,
+  } = useInstructionSearch(location.state?.containerSearch || "", clientId)
 
   // Pagination state - ADDED
   const [currentPage, setCurrentPage] = useState(1)
@@ -195,36 +200,6 @@ const CompanyInstructions = () => {
     fetchInstructions()
   }, [clientId])
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(containerSearch), 400)
-    return () => clearTimeout(timer)
-  }, [containerSearch])
-
-  useEffect(() => {
-    if (!debouncedSearch.trim()) {
-      setSearchMatchedKeys(null)
-      setContainerSearchLoading(false)
-      return
-    }
-
-    const runSearch = async () => {
-      try {
-        setContainerSearchLoading(true)
-        const params = new URLSearchParams({ q: debouncedSearch.trim() })
-        if (clientId) params.append("clientId", clientId)
-        const response = await api.get(`/api/instructions/search?${params}`)
-        const matched = new Set((response.data || []).map((i) => String(i.m1key)))
-        setSearchMatchedKeys(matched)
-      } catch (err) {
-        console.error("Error running instruction search", err)
-      } finally {
-        setContainerSearchLoading(false)
-      }
-    }
-
-    runSearch()
-  }, [debouncedSearch, clientId])
-
   const handleFilterClick = (filter) => {
     setActiveFilter(filter)
     setCurrentPage(1) // Reset to first page when filter changes - ADDED
@@ -249,7 +224,9 @@ const CompanyInstructions = () => {
     let filtered = [...instructions]
 
     // Filter by month and year if selected
-    if (selectedMonth) {
+    // An active search looks across every month, type and status, so a match is never
+    // hidden by a filter the user has forgotten is set.
+    if (selectedMonth && !isSearching) {
       filtered = filtered.filter((item) => {
         if (!item.startingdate) return false;
         const date = new Date(item.startingdate)
@@ -271,7 +248,7 @@ const CompanyInstructions = () => {
       })
     }
 
-    if (selectedYear) {
+    if (selectedYear && !isSearching) {
       filtered = filtered.filter((item) => {
         if (!item.startingdate) return false;
         const date = new Date(item.startingdate)
@@ -280,7 +257,7 @@ const CompanyInstructions = () => {
     }
 
     // Filter by status or type
-    if (activeFilter !== "All") {
+    if (activeFilter !== "All" && !isSearching) {
       const normalizedActiveFilter = (activeFilter || "").toLowerCase()
       if (["new", "in progress", "completed"].includes(normalizedActiveFilter)) {
         filtered = filtered.filter(
@@ -331,8 +308,8 @@ const CompanyInstructions = () => {
       }
     }
 
-    if (searchMatchedKeys !== null) {
-      filtered = filtered.filter((item) => searchMatchedKeys.has(String(item.m1key)))
+    if (isSearching) {
+      filtered = matchedKeys ? filtered.filter((item) => matchedKeys.has(String(item.m1key))) : []
     }
 
     // Sort by status priority first, then by instruction number (descending)
@@ -368,7 +345,7 @@ const CompanyInstructions = () => {
   // Reset to first page when month or year changes - ADDED
   useEffect(() => {
     setCurrentPage(1)
-  }, [selectedMonth, selectedYear])
+  }, [selectedMonth, selectedYear, activeFilter, matchedKeys])
 
   // Handle view instruction click
   const handleViewInstruction = (instructionId) => {
@@ -513,7 +490,7 @@ const CompanyInstructions = () => {
         <div style={{ margin: "10px 0", textAlign: "center" }}>
           <input
             type="text"
-            placeholder="Search by container number or client ref"
+            placeholder="Search by container, client ref, booking ref, KSM ref or instruction #"
             value={containerSearch}
             onChange={(e) => {
               setContainerSearch(e.target.value)
@@ -529,6 +506,19 @@ const CompanyInstructions = () => {
             }}
           />
         </div>
+        {isSearching && !containerSearchLoading && !searchError && (
+          <div style={{ margin: "0 0 10px", textAlign: "center", fontSize: "14px", color: "#555" }}>
+            {filteredInstructions.length} {filteredInstructions.length === 1 ? "match" : "matches"} across all
+            months, types and statuses.{" "}
+            <button
+              type="button"
+              onClick={() => setContainerSearch("")}
+              style={{ background: "none", border: "none", padding: 0, color: "#1a73e8", cursor: "pointer", textDecoration: "underline", font: "inherit" }}
+            >
+              Clear search
+            </button>
+          </div>
+        )}
 
         <div className="tables-container">
           {loading ? (
@@ -556,9 +546,22 @@ const CompanyInstructions = () => {
                   <tr>
                     <td colSpan="10">Searching...</td>
                   </tr>
-                ) : getFilteredInstructions().length === 0 ? (
+                ) : searchError ? (
                   <tr>
-                    <td colSpan="10">No instructions found</td>
+                    <td colSpan="10">
+                      {searchError}{" "}
+                      <button type="button" className="view-btn" onClick={retrySearch}>
+                        Try again
+                      </button>
+                    </td>
+                  </tr>
+                ) : filteredInstructions.length === 0 ? (
+                  <tr>
+                    <td colSpan="10">
+                      {isSearching
+                        ? "No instructions match that container, client ref, booking ref, KSM ref or instruction #"
+                        : "No instructions found"}
+                    </td>
                   </tr>
                 ) : (
                   currentInstructions.map((item) => {
