@@ -479,7 +479,17 @@ const getTurnoverVsDieselCost = async (numericMonth, year) => {
 // Each contribution keeps its category (instructions / addons / creditNotes)
 // and the VAT on it (see "Categories and VAT" above), so IncomePerTruck gives
 // <category>_ex and <category>_vat per truck; total_income is the ex-VAT net.
-const truckIncomeCTE = (truckFilter = "") => `
+//
+// scope picks the trucks: "own" (active in-house trucks, the default),
+// "subcontractor" (subcontractor trucks; truckFilter can narrow to one company
+// with t.subei_reg_num), or "all" (every truck, including ones not in m5_trucks,
+// so it is the month's whole work-done turnover).
+const TRUCK_SCOPES = {
+  own: "t.is_subcontractor = false AND t.status = true",
+  subcontractor: "t.is_subcontractor = true",
+  all: "TRUE",
+}
+const truckIncomeCTE = (truckFilter = "", scope = "own") => `
     AssignedLegs AS (
       SELECT DISTINCT
         l.m1key,
@@ -638,9 +648,8 @@ const truckIncomeCTE = (truckFilter = "") => `
         COALESCE(SUM(tc.ex) FILTER (WHERE tc.category = 'creditNotes'), 0) AS credit_ex,
         COALESCE(SUM(tc.vat) FILTER (WHERE tc.category = 'creditNotes'), 0) AS credit_vat
       FROM TruckContributions tc
-      JOIN m5_trucks t ON tc.truckregnumber = t.truckregnum
-      WHERE t.is_subcontractor = false
-        AND t.status = true
+      LEFT JOIN m5_trucks t ON tc.truckregnumber = t.truckregnum
+      WHERE ${TRUCK_SCOPES[scope]}
         AND TRIM(TO_CHAR(tc.leg_date, 'Month')) = $1
         AND EXTRACT(YEAR FROM tc.leg_date)::TEXT = $2
         ${truckFilter}
@@ -680,42 +689,35 @@ const getTurnoverPerTruck = async (client, month, year) => {
   }))
 }
 
-// A subcontractor's share of the turnover: each job's ex-VAT value split
-// equally across its legs, then across the drivers on each leg — counted once
-// per (job, leg, driver). legs_m2 has a row per container moved, so summing
-// the raw rows multiplied a driver's share by their container count (August
-// 2026 showed subcontractor turnover at 275% of total turnover). Jobs are
-// taken by capture date (created_at); VAT is the instruction's rate.
-const subcontractorTurnoverQuery = (withSubcontractor) => `
-  WITH DistinctLegs AS (
-    SELECT m1key, COUNT(DISTINCT legnumber) AS num_legs
-    FROM legs_m2
-    GROUP BY m1key
-  ),
-  DriverCountsPerLeg AS (
-    SELECT m1key, legnumber, COUNT(DISTINCT driverid) AS drivers_per_leg
-    FROM legs_m2
-    GROUP BY m1key, legnumber
-  ),
-  LegDrivers AS (
-    SELECT DISTINCT m1key, legnumber, driverid
-    FROM legs_m2
+// A subcontractor's share of the turnover uses the same allocation as Turnover
+// per Truck (truckIncomeCTE): container- or ton-weighted, by leg date, credit
+// notes deducted. Subcontractors are the trucks flagged is_subcontractor, and a
+// company's trucks share its subei_reg_num. It is compared with the month's
+// whole work-done turnover (every truck, same rules) rather than the invoiced
+// turnover, which is dated differently and would not be comparable.
+const workTurnoverCategories = async (client, month, year, scope, subcontractorId = null) => {
+  const result = await client.query(
+    `WITH ${truckIncomeCTE(subcontractorId ? "AND t.subei_reg_num = $3" : "", scope)}
+     SELECT
+       SUM(instructions_ex) AS instructions_ex, SUM(instructions_vat) AS instructions_vat,
+       SUM(addons_ex) AS addons_ex, SUM(addons_vat) AS addons_vat,
+       SUM(credit_ex) AS credit_ex, SUM(credit_vat) AS credit_vat
+     FROM IncomePerTruck`,
+    subcontractorId ? [month, year, subcontractorId] : [month, year]
   )
-  SELECT
-    ${withSubcontractor ? "COALESCE(e.companyname, 'Unknown') AS companyname," : ""}
-    SUM(m.total_cost / dl.num_legs / dcpl.drivers_per_leg) AS ex,
-    SUM(m.total_cost * COALESCE(m.vat, 0)::numeric / 100 / dl.num_legs / dcpl.drivers_per_leg) AS vat
-  FROM LegDrivers l
-  JOIN m1_controller m ON l.m1key = m.m1key
-  JOIN DistinctLegs dl ON l.m1key = dl.m1key
-  JOIN DriverCountsPerLeg dcpl ON l.m1key = dcpl.m1key AND l.legnumber = dcpl.legnumber
-  JOIN m5_employee e ON l.driverid = e.userid
-  WHERE e.roleid = 6
-    AND m.created_at >= $1
-    AND m.created_at < $2
-    ${withSubcontractor ? "AND e.subei_reg_num = $3" : ""}
-  GROUP BY ${withSubcontractor ? "COALESCE(e.companyname, 'Unknown')" : "()"}
-`
+  return truckIncomeCategories(result.rows[0] || {})
+}
+
+// Collapses the income categories into one subcontractor-turnover category.
+const asSubcontractorTurnover = (categories) => {
+  const parts = Object.values(categories)
+  return {
+    subcontractorTurnover: cat(
+      parts.reduce((sum, c) => sum + c.ex, 0),
+      parts.reduce((sum, c) => sum + c.vat, 0)
+    ),
+  }
+}
 
 const totalTurnoverRow = (categories, month, year) => ({
   name: "Total Turnover",
@@ -726,51 +728,49 @@ const totalTurnoverRow = (categories, month, year) => ({
   year: year.toString(),
 })
 
-const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
-  const { dateFrom, dateTo } = getDateRange(month, year)
-  const [turnover, subbieResult] = await Promise.all([
-    calculateMonthlyTurnoverBreakdown(client, dateFrom, dateTo),
-    client.query(
-      subcontractorTurnoverQuery(false),
-      [dateFrom, dateTo]
-    ),
-  ])
+const workTurnoverRow = (categories, month, year) => ({
+  ...totalTurnoverRow(categories, month, year),
+  name: "Total Turnover (work done)",
+})
 
-  const subbie = { subcontractorTurnover: cat(subbieResult.rows[0]?.ex, subbieResult.rows[0]?.vat) }
+const subcontractorRow = (name, categories, month, year) => ({
+  name,
+  value: sumCats(categories),
+  type: "subcontractor",
+  categories,
+  month: month.trim(),
+  year: year.toString(),
+})
+
+const getSubcontractorTurnoverPerMonth = async (client, month, year) => {
+  const [total, subbie] = await Promise.all([
+    workTurnoverCategories(client, month, year, "all"),
+    workTurnoverCategories(client, month, year, "subcontractor"),
+  ])
   return [
-    totalTurnoverRow(turnover, month, year),
-    {
-      name: "Total Subcontractor Turnover",
-      value: sumCats(subbie),
-      type: "subcontractor",
-      categories: subbie,
-      month: month.trim(),
-      year: year.toString(),
-    },
+    workTurnoverRow(total, month, year),
+    subcontractorRow("Total Subcontractor Turnover", asSubcontractorTurnover(subbie), month, year),
   ]
 }
 
 const getSubcontractorVsTurnover = async (client, month, year, subcontractorId = null) => {
-  const { dateFrom, dateTo } = getDateRange(month, year)
-  const [turnover, subbieResult] = await Promise.all([
-    calculateMonthlyTurnoverBreakdown(client, dateFrom, dateTo),
+  const [total, subbie, company] = await Promise.all([
+    workTurnoverCategories(client, month, year, "all"),
     subcontractorId
-      ? client.query(subcontractorTurnoverQuery(true), [dateFrom, dateTo, subcontractorId])
-      : Promise.resolve({ rows: [] }),
+      ? workTurnoverCategories(client, month, year, "subcontractor", subcontractorId)
+      : null,
+    subcontractorId
+      ? client.query(
+          "SELECT MIN(companyname) AS companyname FROM m5_employee WHERE roleid = 6 AND subei_reg_num = $1",
+          [subcontractorId]
+        )
+      : null,
   ])
 
-  const data = [totalTurnoverRow(turnover, month, year)]
-  const row = subbieResult.rows[0]
-  if (row) {
-    const categories = { subcontractorTurnover: cat(row.ex, row.vat) }
-    data.push({
-      name: row.companyname,
-      value: sumCats(categories),
-      type: "subcontractor",
-      categories,
-      month: month.trim(),
-      year: year.toString(),
-    })
+  const data = [workTurnoverRow(total, month, year)]
+  if (subbie) {
+    const name = company.rows[0]?.companyname || "Unknown"
+    data.push(subcontractorRow(name, asSubcontractorTurnover(subbie), month, year))
   }
   return data
 }
@@ -969,7 +969,9 @@ const getTruckIncomeVsExpense = async (client, month, year, truckId = null) => {
 // chart reads it); "parts" is every other purchase order — fuel POs are left
 // out because they are the same money as the expenses_m2 fuel rows (counting
 // both double-counted fuel). Subcontractors are their driver rates by leg date.
-const monthlyExpenseBreakdown = async (client, month, year, { creditNotes = false } = {}) => {
+// Credit notes are not an expense: they reduce turnover, where they are already
+// deducted.
+const monthlyExpenseBreakdown = async (client, month, year) => {
   const params = [month, year]
   const fuelQuery = `
     SELECT COALESCE(SUM(e.expensecost), 0) AS ex, COALESCE(SUM(${fuelVatSql("e")}), 0) AS vat
@@ -985,32 +987,18 @@ const monthlyExpenseBreakdown = async (client, month, year, { creditNotes = fals
       AND TRIM(to_char(po.date, 'Month')) = $1
       AND EXTRACT(YEAR FROM po.date)::text = $2
   `
-  const creditNotesQuery = `
-    SELECT
-      COALESCE(SUM(amt.amount), 0) AS ex,
-      COALESCE(SUM(amt.amount * COALESCE(m.vat, 0)::numeric / 100), 0) AS vat
-    FROM credit_notes cn
-    CROSS JOIN LATERAL unnest(cn.amount) AS amt(amount)
-    LEFT JOIN m1_controller m ON m.m1key = cn.m1key
-    WHERE TRIM(to_char(cn.creditnote_date, 'Month')) = $1
-      AND EXTRACT(YEAR FROM cn.creditnote_date)::text = $2
-  `
-
-  const [fuel, parts, subbies, credits] = await Promise.all([
+  const [fuel, parts, subbies] = await Promise.all([
     client.query(fuelQuery, params),
     client.query(partsQuery, params),
     client.query(subcontractorExpenseQuery(false), params),
-    creditNotes ? client.query(creditNotesQuery, params) : Promise.resolve(null),
   ])
 
   const row = (result) => cat(result.rows[0]?.ex, result.rows[0]?.vat)
-  const categories = {
+  return {
     fuel: row(fuel),
     parts: row(parts),
     subcontractors: row(subbies),
   }
-  if (credits) categories.creditNotes = row(credits)
-  return categories
 }
 
 // Income vs Expense uses this as its expense side (its income side is the
@@ -1049,7 +1037,7 @@ const getAllExpenses = async (client, month, year) => {
 
 const getWagesVsExpenses = async (client, month, year) => {
   const [expenses, totalWages] = await Promise.all([
-    monthlyExpenseBreakdown(client, month, year, { creditNotes: true }),
+    monthlyExpenseBreakdown(client, month, year),
     getTotalWagesForMonth(client, month, year),
   ])
   const wages = { wages: cat(totalWages, 0) }
