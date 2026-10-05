@@ -883,72 +883,358 @@ const ClientStatement = () => {
   );
 
   // Excel mirror of the PDF. Same rows, same totals — the spreadsheet is a
-  // second rendering of the frozen payload, not a different calculation.
-  const buildExcel = async () => {
+  // second rendering of the frozen payload, not a different calculation. Laid
+  // out like the PDF (masthead, balance due, summary, age analysis, ledger, how
+  // to pay), but kept a working spreadsheet: dates and amounts are real date and
+  // number cells, the ledger header is frozen and filterable, and it prints on
+  // A4. `logo` is a data URL from loadLogo(), or null to lay out without one.
+  const buildExcel = async (logo) => {
+    // Same palette as the PDF and the screen.
+    const C = {
+      navy: "FF1F4E88",
+      deep: "FF16375F",
+      text: "FF4A5A72",
+      muted: "FF5A6B81",
+      border: "FFDAE4F0",
+      row: "FFEEF2F8",
+      tint: "FFF6F9FD",
+      callout: "FFCFDCEC",
+      green: "FF067647",
+      white: "FFFFFFFF",
+    };
+    const PILL = {
+      Opening: { bg: "FFEEF1F5", fg: "FF475467" },
+      Invoice: { bg: "FFEAF1FB", fg: C.navy },
+      Payments: { bg: "FFE7F6EE", fg: C.green },
+      Insurance: { bg: "FFFFF4E5", fg: "FFB54708" },
+    };
+    const MONEY = '"R"#,##0.00;[Red]-"R"#,##0.00';
+    const DATE = "dd/mm/yyyy";
+    const fill = (argb) => ({ type: "pattern", pattern: "solid", fgColor: { argb } });
+    const line = (argb, style = "thin") => ({ style, color: { argb } });
+    // Only the sides that are set — an undefined side is not written as "none".
+    const sides = (obj) =>
+      Object.fromEntries(Object.entries(obj).filter(([, v]) => v));
+
+    // Excel dates have no time zone: a local-midnight Date written as-is lands
+    // on the previous day for anyone east of UTC (all of South Africa), so the
+    // calendar day is re-expressed as UTC midnight.
+    const excelDate = (value) => {
+      if (!value) return null;
+      const d = value instanceof Date ? value : new Date(value);
+      if (Number.isNaN(d.getTime())) return null;
+      return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    };
+
+    const client = statement.client || {};
+    const statementDate = excelDate(periodEndDate(statement));
+    const periodLabel =
+      periodLabelOf(statement) || getDisplayDate(statement.generation_date);
+
     const workbook = new Workbook();
-    const sheet = workbook.addWorksheet("Statement");
-    sheet.columns = [
-      { width: 14 }, { width: 14 }, { width: 42 },
-      { width: 18 }, { width: 15 }, { width: 15 }, { width: 15 },
-    ];
+    workbook.creator = statement.company_name || "";
+    workbook.title = `Statement of account - ${periodLabel}`;
+    workbook.created = new Date();
 
-    let row = 1;
-    sheet.getCell(`A${row}`).value = statement.company_name || "";
-    sheet.getCell(`A${row}`).font = { bold: true, size: 14 };
-    row += 2;
-
-    sheet.getCell(`A${row}`).value = "Client:";
-    sheet.getCell(`B${row}`).value = statement.client?.name || "";
-    row++;
-    sheet.getCell(`A${row}`).value = "Statement date:";
-    sheet.getCell(`B${row}`).value = getDisplayDate(statement.generation_date);
-    row += 2;
-
-    const header = sheet.getRow(row);
-    header.values = ["Date", "Type", "Details", "Reference", "Amount", "Payment", "Balance"];
-    header.font = { bold: true };
-    header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD3D3D3" } };
-    row++;
-
-    sheet.getRow(row).values = ["", "", "Opening balance", "", "", "", openingBalance];
-    sheet.getCell(`G${row}`).numFmt = '"R"#,##0.00';
-    row++;
-
-    uiTransactions.forEach((tx) => {
-      const r = sheet.getRow(row);
-      r.values = [
-        tx.date ? new Date(tx.date).toLocaleDateString("en-GB") : "",
-        tx.type || "",
-        tx.details || "",
-        tx.reference || "",
-        tx.amount || null,
-        tx.payment || null,
-        tx.balance,
-      ];
-      ["E", "F", "G"].forEach((c) => {
-        sheet.getCell(`${c}${row}`).numFmt = '"R"#,##0.00';
-      });
-      row++;
+    const sheet = workbook.addWorksheet("Statement", {
+      views: [{ showGridLines: false }],
+      properties: { defaultRowHeight: 16 },
+      pageSetup: {
+        paperSize: 9, // A4
+        orientation: "portrait",
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+        horizontalCentered: true,
+        margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.6, header: 0.2, footer: 0.25 },
+      },
+      headerFooter: {
+        oddFooter: `&L&8${[
+          statement.company_name,
+          statement.vat_reg_num && `VAT Reg No ${statement.vat_reg_num}`,
+        ]
+          .filter(Boolean)
+          .join("  ·  ")}&R&8Page &P of &N`,
+      },
     });
 
-    row++;
+    // Reference sits before Details (unlike the PDF) so the narrow columns on
+    // the left can carry the label/value blocks above the ledger.
+    sheet.columns = [
+      { key: "date", width: 13 },
+      { key: "type", width: 13 },
+      { key: "reference", width: 17 },
+      { key: "details", width: 48 },
+      { key: "amount", width: 17 },
+      { key: "payment", width: 17 },
+      { key: "balance", width: 18 },
+    ];
+
+    const set = (address, value, style = {}) => {
+      const cell = sheet.getCell(address);
+      cell.value = value;
+      Object.assign(cell, style);
+      return cell;
+    };
+    const font = (opts = {}) => ({ name: "Calibri", size: 10, color: { argb: C.text }, ...opts });
+    const labelFont = (argb = C.muted) => font({ size: 8, bold: true, color: { argb } });
+
+    // ---- Masthead ----------------------------------------------------------
+    if (logo) {
+      const imageId = workbook.addImage({ base64: logo, extension: "jpeg" });
+      sheet.addImage(imageId, { tl: { col: 0.15, row: 0.2 }, ext: { width: 72, height: 72 } });
+    }
+    const nameCol = logo ? "B" : "A";
+    [1, 2, 3, 4].forEach((r) => {
+      sheet.getRow(r).height = r === 1 ? 24 : 15;
+    });
+    sheet.mergeCells(`${nameCol}1:D1`);
+    set(`${nameCol}1`, statement.company_name || "", {
+      font: font({ size: 16, bold: true, color: { argb: C.deep } }),
+      alignment: { vertical: "middle" },
+    });
+    companyLinesOf(statement).forEach((text, i) => {
+      sheet.mergeCells(`${nameCol}${2 + i}:D${2 + i}`);
+      set(`${nameCol}${2 + i}`, text, { font: font({ size: 9, color: { argb: C.muted } }) });
+    });
+
+    sheet.mergeCells("E1:G1");
+    set("E1", "STATEMENT OF ACCOUNT", {
+      font: labelFont(C.navy),
+      alignment: { horizontal: "right", vertical: "bottom" },
+    });
+    sheet.mergeCells("E2:G2");
+    set("E2", periodLabel, {
+      font: font({ size: 14, bold: true, color: { argb: C.deep } }),
+      alignment: { horizontal: "right" },
+    });
+    sheet.mergeCells("E3:G3");
+    set("E3", statementDate, {
+      numFmt: `"Statement date "${DATE}`,
+      font: font({ size: 9, color: { argb: C.muted } }),
+      alignment: { horizontal: "right" },
+    });
+    ["A", "B", "C", "D", "E", "F", "G"].forEach((col) => {
+      sheet.getCell(`${col}5`).border = { top: line(C.navy, "medium") };
+    });
+    sheet.getRow(5).height = 8;
+
+    // ---- Statement for + balance due ---------------------------------------
+    set("A6", "STATEMENT FOR", { font: labelFont() });
+    sheet.mergeCells("A7:D7");
+    set("A7", client.name || "", { font: font({ size: 12, bold: true, color: { argb: C.deep } }) });
+    let r = 8;
+    [
+      client.representative && `Attn: ${client.representative}`,
+      [client.address, client.suburb].filter(Boolean).join(", "),
+      [client.email, client.phone].filter(Boolean).join("  ·  "),
+    ]
+      .filter(Boolean)
+      .forEach((text) => {
+        sheet.mergeCells(`A${r}:D${r}`);
+        set(`A${r}`, text, { font: font({ size: 9.5 }) });
+        r += 1;
+      });
+
+    // The balance-due callout, boxed and tinted like the PDF's.
+    sheet.mergeCells("F6:G6");
+    sheet.mergeCells("F7:G7");
+    sheet.mergeCells("F8:G8");
+    set("F6", "BALANCE DUE", { font: labelFont(C.navy) });
+    set("F7", balanceDue, {
+      numFmt: MONEY,
+      font: font({ size: 16, bold: true, color: { argb: C.deep } }),
+      alignment: { horizontal: "left", vertical: "middle" },
+    });
+    set("F8", statementDate, { numFmt: `"as at "${DATE}`, font: font({ size: 8.5, color: { argb: C.muted } }), alignment: { horizontal: "left" } });
+    sheet.getRow(7).height = 24;
+    [6, 7, 8].forEach((rowNum) => {
+      ["F", "G"].forEach((col) => {
+        const cell = sheet.getCell(`${col}${rowNum}`);
+        cell.fill = fill(C.tint);
+        cell.border = sides({
+          top: rowNum === 6 && line(C.navy, "medium"),
+          bottom: rowNum === 8 && line(C.callout),
+          left: col === "F" && line(C.callout),
+          right: col === "G" && line(C.callout),
+        });
+      });
+    });
+    r = Math.max(r, 9) + 1;
+
+    // ---- Account summary (A:C) and age analysis (E:G), side by side ---------
+    const blockTop = r;
+    set(`A${blockTop}`, "Account summary", { font: font({ size: 11, bold: true, color: { argb: C.deep } }) });
+    set(`E${blockTop}`, "Age analysis", { font: font({ size: 11, bold: true, color: { argb: C.deep } }) });
+
     const summary = [
       ["Opening balance", openingBalance],
-      ["Invoiced", invoicedAmount],
-      ["Payments & credit notes", totalAmountPaid],
-      ["Insurance credit", insuranceCredit],
-      ["Balance due", balanceDue],
+      ["+ Invoiced", invoicedAmount],
+      ["- Payments & credit notes", totalAmountPaid],
+      ...(insuranceCredit > 0 ? [["- Insurance credit", insuranceCredit]] : []),
     ];
-    summary.forEach(([label, value], i) => {
-      sheet.getCell(`F${row}`).value = label;
-      sheet.getCell(`G${row}`).value = value;
-      sheet.getCell(`G${row}`).numFmt = '"R"#,##0.00';
-      if (i === summary.length - 1) {
-        sheet.getCell(`F${row}`).font = { bold: true };
-        sheet.getCell(`G${row}`).font = { bold: true };
-      }
-      row++;
+    const agingRows = [
+      ["Current", statement.aging?.current || 0],
+      ["31-60 days", statement.aging?.["30days"] || 0],
+      ["61-90 days", statement.aging?.["60days"] || 0],
+      ["91+ days", statement.aging?.["90days"] || 0],
+    ];
+    const blockRow = (labelCol, valueCol, rowNum, text, value, total = false) => {
+      const lastLabelCol = String.fromCharCode(valueCol.charCodeAt(0) - 1);
+      sheet.mergeCells(`${labelCol}${rowNum}:${lastLabelCol}${rowNum}`);
+      const labelCell = set(`${labelCol}${rowNum}`, text, {
+        font: font(total ? { bold: true, color: { argb: C.deep } } : {}),
+      });
+      const valueCell = set(`${valueCol}${rowNum}`, value, {
+        numFmt: MONEY,
+        font: font({ bold: true, color: { argb: C.deep } }),
+        alignment: { horizontal: "right" },
+      });
+      [labelCell, sheet.getCell(`${lastLabelCol}${rowNum}`), valueCell].forEach((cell) => {
+        cell.border = total
+          ? { top: line(C.navy, "medium") }
+          : { bottom: line(C.row) };
+        if (total) cell.fill = fill(C.tint);
+      });
+    };
+
+    summary.forEach(([text, value], i) => blockRow("A", "C", blockTop + 1 + i, text, value));
+    const summaryTotalRow = blockTop + 1 + summary.length;
+    blockRow("A", "C", summaryTotalRow, "Balance due", balanceDue, true);
+
+    agingRows.forEach(([text, value], i) => blockRow("E", "G", blockTop + 1 + i, text, value));
+    const agingTotalRow = blockTop + 1 + agingRows.length;
+    blockRow(
+      "E",
+      "G",
+      agingTotalRow,
+      "Total outstanding",
+      agingRows.reduce((s, [, v]) => s + v, 0),
+      true
+    );
+
+    // ---- Transactions -------------------------------------------------------
+    r = Math.max(summaryTotalRow, agingTotalRow) + 2;
+    set(`A${r}`, "Transactions", { font: font({ size: 11, bold: true, color: { argb: C.deep } }) });
+    r += 1;
+
+    const headerRow = r;
+    const headers = ["Date", "Type", "Reference", "Details", "Amount", "Payments", "Balance"];
+    sheet.getRow(headerRow).values = headers.map((h) => h.toUpperCase());
+    sheet.getRow(headerRow).height = 20;
+    headers.forEach((_, i) => {
+      const cell = sheet.getRow(headerRow).getCell(i + 1);
+      cell.font = labelFont(C.deep);
+      cell.fill = fill(C.tint);
+      cell.border = { top: line(C.border), bottom: line(C.navy, "medium") };
+      // The indent keeps right-aligned labels clear of the filter buttons.
+      cell.alignment =
+        i >= 4
+          ? { vertical: "middle", horizontal: "right", indent: 2 }
+          : { vertical: "middle", horizontal: "left" };
     });
+
+    // Wrapped text does not grow the row on its own in Excel, so the height is
+    // estimated from the Details column's width.
+    const detailsChars = sheet.getColumn("details").width * 1.15;
+    const ledger = [
+      {
+        date: statementDate,
+        type: "Opening",
+        reference: "",
+        details: "Balance brought forward",
+        amount: null,
+        payment: null,
+        balance: openingBalance,
+      },
+      ...uiTransactions.map((tx) => ({
+        date: excelDate(tx.date),
+        type: tx.type || "",
+        reference: tx.reference || "",
+        details: String(tx.details || "").replace(/\s+/g, " ").trim(),
+        amount: tx.amount || null,
+        payment: tx.payment || null,
+        balance: tx.balance,
+      })),
+    ];
+    ledger.forEach((entry) => {
+      r += 1;
+      const rowObj = sheet.getRow(r);
+      rowObj.values = [
+        entry.date,
+        entry.type,
+        entry.reference,
+        entry.details,
+        entry.amount,
+        entry.payment,
+        entry.balance,
+      ];
+      const lines = Math.max(1, Math.ceil(entry.details.length / detailsChars));
+      rowObj.height = Math.max(18, lines * 13 + 5);
+      const pill = PILL[entry.type] || PILL.Opening;
+      rowObj.eachCell({ includeEmpty: true }, (cell, col) => {
+        cell.font = font({ color: { argb: C.deep } });
+        cell.alignment = { vertical: "middle", wrapText: col === 4 };
+        cell.border = { bottom: line(C.row) };
+      });
+      rowObj.getCell(1).numFmt = DATE;
+      rowObj.getCell(1).alignment = { vertical: "middle", horizontal: "left" };
+      rowObj.getCell(2).font = font({ size: 8.5, bold: true, color: { argb: pill.fg } });
+      rowObj.getCell(2).fill = fill(pill.bg);
+      [5, 6, 7].forEach((col) => {
+        rowObj.getCell(col).numFmt = MONEY;
+      });
+      rowObj.getCell(6).font = font({ color: { argb: C.green } });
+      rowObj.getCell(7).font = font({ bold: true, color: { argb: C.deep } });
+    });
+    const lastLedgerRow = r;
+
+    r += 1;
+    sheet.mergeCells(`A${r}:F${r}`);
+    set(`A${r}`, "Balance due", {
+      font: font({ size: 11, bold: true, color: { argb: C.deep } }),
+      alignment: { horizontal: "right", vertical: "middle" },
+    });
+    set(`G${r}`, balanceDue, {
+      numFmt: MONEY,
+      font: font({ size: 11, bold: true, color: { argb: C.deep } }),
+      alignment: { horizontal: "right", vertical: "middle" },
+    });
+    sheet.getRow(r).height = 22;
+    ["A", "B", "C", "D", "E", "F", "G"].forEach((col) => {
+      const cell = sheet.getCell(`${col}${r}`);
+      cell.fill = fill(C.tint);
+      cell.border = { top: line(C.navy, "medium"), bottom: line(C.border) };
+    });
+
+    sheet.autoFilter = { from: { row: headerRow, column: 1 }, to: { row: lastLedgerRow, column: 7 } };
+    // Keep the ledger header in view while scrolling, and on every printed page.
+    sheet.views = [{ state: "frozen", ySplit: headerRow, showGridLines: false }];
+    sheet.pageSetup.printTitlesRow = `${headerRow}:${headerRow}`;
+
+    // ---- How to pay -----------------------------------------------------------
+    const payment = paymentDetailsOf(statement);
+    if (payment.length > 0) {
+      r += 2;
+      set(`A${r}`, "How to pay", { font: font({ size: 11, bold: true, color: { argb: C.deep } }) });
+      payment.forEach(([name, value]) => {
+        r += 1;
+        sheet.mergeCells(`A${r}:B${r}`);
+        sheet.mergeCells(`C${r}:D${r}`);
+        set(`A${r}`, name, { font: labelFont() });
+        // Text, not numbers — account numbers lose leading zeros otherwise.
+        set(`C${r}`, String(value), { font: font({ bold: true, color: { argb: C.deep } }) });
+        ["A", "B", "C", "D"].forEach((col) => {
+          const cell = sheet.getCell(`${col}${r}`);
+          cell.fill = fill(C.tint);
+          cell.border = sides({
+            bottom: line(C.row),
+            left: col === "A" && line(C.navy, "thick"),
+          });
+          cell.alignment = { vertical: "middle" };
+        });
+      });
+    }
 
     const buffer = await workbook.xlsx.writeBuffer();
     return {
@@ -992,7 +1278,7 @@ const ClientStatement = () => {
       }
 
       const { blob, filename } =
-        format === "PDF" ? buildPdf(await loadLogo()) : await buildExcel();
+        format === "PDF" ? buildPdf(await loadLogo()) : await buildExcel(await loadLogo());
 
       saveBlob(blob, filename);
 
