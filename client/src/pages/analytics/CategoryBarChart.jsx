@@ -65,10 +65,12 @@ const readVatPreference = (storageKey, fallback) => {
   return fallback;
 };
 
-export function useVatToggle(chartKey, defaultIncludeVat) {
-  const storageKey = `analytics.vat.${chartKey}`;
+// Every chart starts on Incl. VAT. (The "v2" key starts everyone's remembered
+// choices afresh, from when charts defaulted to different bases.)
+export function useVatToggle(chartKey) {
+  const storageKey = `analytics.vat.v2.${chartKey}`;
   const [chosen, setChosen] = useState({});
-  const includeVat = chosen[storageKey] ?? readVatPreference(storageKey, defaultIncludeVat);
+  const includeVat = chosen[storageKey] ?? readVatPreference(storageKey, true);
 
   const setIncludeVat = (next) => {
     setChosen((previous) => ({ ...previous, [storageKey]: next }));
@@ -143,7 +145,12 @@ export const stacksOf = (categories) => [...new Set(categories.map((c) => c.stac
 // Bars: thin, the outer end of each stack rounded (square at the baseline),
 // and a 2px gap of card colour between stacked segments instead of outlines.
 // Chart chrome: recessive hairline grid and baseline, a faint hover band.
-const CHROME = { grid: "#ebeae5", baseline: "#c9c7bf", hover: "rgba(42, 120, 214, 0.06)" };
+const CHROME = {
+  grid: "#ebeae5",
+  baseline: "#c9c7bf",
+  budget: "#9a988f",
+  hover: "rgba(42, 120, 214, 0.06)",
+};
 const GAP = 2;
 const RADIUS = 4;
 
@@ -249,7 +256,7 @@ const RowTick = ({ x, y, payload }) => {
 // --- Tooltip ----------------------------------------------------------------
 // Values lead; series names follow in quieter ink; a short line of the series
 // colour keys each row.
-function ChartTooltip({ active, payload, categories, stackLabels, net, includeVat, statusOf }) {
+function ChartTooltip({ active, payload, categories, stackLabels, net, includeVat, statusOf, shareOf }) {
   if (!active || !payload || !payload.length) return null;
   const point = payload[0].payload;
   const stacks = stacksOf(categories);
@@ -300,6 +307,13 @@ function ChartTooltip({ active, payload, categories, stackLabels, net, includeVa
           <span>{formatRand(netValue)}</span>
         </div>
       )}
+      {shareOf && (
+        <div className="az-tooltip-row az-tooltip-share">
+          <span className="az-tooltip-key az-tooltip-key-blank" />
+          <span className="az-tooltip-name">Share of total</span>
+          <span className="az-tooltip-value">{`${shareOf(point).toFixed(1)}%`}</span>
+        </div>
+      )}
       {status && (
         <div className="az-tooltip-status">
           <span className="az-status-dot" style={{ backgroundColor: status.color }} />
@@ -310,17 +324,41 @@ function ChartTooltip({ active, payload, categories, stackLabels, net, includeVa
   );
 }
 
+// A ranking bar: one colour per bar (the row's total), rounded at the value end.
+const rankShape = (props) => {
+  const { fill } = props;
+  let { x, y, width, height } = props;
+  if (!width || !height) return null;
+  const positive = width > 0;
+  if (width < 0) {
+    x += width;
+    width = -width;
+  }
+  if (height < 0) {
+    y += height;
+    height = -height;
+  }
+  const r = Math.min(RADIUS, width, height / 2);
+  const corners = positive ? { tl: 0, tr: r, br: r, bl: 0 } : { tl: r, tr: 0, br: 0, bl: r };
+  return <path d={roundedRectPath(x, y, width, height, corners)} fill={fill} className="az-bar-segment" />;
+};
+
 /**
- * Stacked bar chart of categorised values.
+ * Bar chart of categorised values.
  *
  * points: from buildPoints(); categories: [{ key, label, color, stack }] —
  *   categories sharing a stack are stacked into one bar; different stacks sit
  *   side by side on each row.
  * stackLabels: { [stack]: "Income" } names each stack in the tooltip.
  * net: { label, plus, minus } a stack difference shown in the tooltip.
- * horizontal: rank rows as horizontal bars (for long lists of trucks).
- * showShare: label horizontal bars with their share of the total.
- * statusColor / statusLabel: colour and name a single-category bar by size.
+ * horizontal: a ranking (long truck lists) — one single-colour bar per row
+ *   showing the row's total, its value at the end, and no value axis or grid.
+ *   The category split lives in the tooltip and the table.
+ * ranking: { color, above, below, markers } for rankings: bars take `color`,
+ *   except those above `above.value` (`above.color`) or below `below.value`
+ *   (`below.color`); `markers` ([{ value, label }]) draw faint dashed lines.
+ * showShare: add each row's share of the total to the tooltip.
+ * statusLabel: (total) => text naming a row's status in the tooltip.
  */
 export default function CategoryBarChart({
   points,
@@ -329,47 +367,57 @@ export default function CategoryBarChart({
   stackLabels,
   net,
   horizontal = false,
+  ranking,
   showShare = false,
-  statusColor,
   statusLabel,
 }) {
   const reducedMotion = usePrefersReducedMotion();
   const [listRef, listHeight] = useElementHeight();
   const stacks = stacksOf(categories);
   const barCount = points.length * stacks.length;
-  const grandTotal = points.reduce(
-    (sum, point) => sum + stacks.reduce((t, s) => t + point[`__total_${s}`], 0),
-    0
-  );
   const hasNegative = points.some((point) => categories.some((c) => point[c.key] < 0));
   // Label every bar only while there are few enough to read; otherwise the
-  // axis, tooltip and table carry the values. Horizontal rankings always label
-  // the bar ends — there is room beside each bar and it is how a ranking reads.
+  // axis, tooltip and table carry the values. Rankings always label the bar
+  // ends — the value is the one thing on each row.
   const showLabels = horizontal || barCount <= 8;
 
-  const statusOf = statusColor
+  // Rankings: one bar per row, its total.
+  const totalKey = `__total_${stacks[0]}`;
+  const rowTotal = (point) => stacks.reduce((sum, s) => sum + point[`__total_${s}`], 0);
+  const grandTotal = points.reduce((sum, point) => sum + rowTotal(point), 0);
+  const rankFill = (total) => {
+    if (ranking?.above && total > ranking.above.value) return ranking.above.color;
+    if (ranking?.below && total < ranking.below.value) return ranking.below.color;
+    return ranking?.color || categories[0]?.color;
+  };
+
+  const statusOf = statusLabel
     ? (point) => {
-        const total = point[`__total_${stacks[0]}`];
-        return { color: statusColor(total), label: statusLabel?.(total) };
+        const total = rowTotal(point);
+        return { color: rankFill(total), label: statusLabel(total) };
       }
     : null;
+  const shareOf = showShare && grandTotal ? (point) => (rowTotal(point) / grandTotal) * 100 : null;
 
   const capLabel = (stack) => (props) => {
-    const { x, y, width: barWidth, height: barHeight, index } = props;
+    const { x, y, width: barWidth, index } = props;
     const point = points[index];
     if (!point || !point[`__has_${stack}`]) return null;
-    const total = point[`__total_${stack}`];
-    if (horizontal) {
-      const pct =
-        showShare && grandTotal ? ` · ${((total / grandTotal) * 100).toFixed(1)}%` : "";
-      return (
-        <text x={x + 8} y={y + barHeight / 2} dy={4} className="az-bar-label" textAnchor="start">
-          {`${formatCompact(total)}${pct}`}
-        </text>
-      );
-    }
     return (
       <text x={x + barWidth / 2} y={y - 8} className="az-bar-label" textAnchor="middle">
+        {formatCompact(point[`__total_${stack}`])}
+      </text>
+    );
+  };
+
+  const endLabel = (props) => {
+    const { x, y, width: barWidth, height: barHeight, index } = props;
+    const point = points[index];
+    if (!point) return null;
+    const total = rowTotal(point);
+    const end = x + Math.max(barWidth, 0);
+    return (
+      <text x={end + 8} y={y + barHeight / 2} dy={4} className="az-bar-label" textAnchor="start">
         {formatCompact(total)}
       </text>
     );
@@ -381,94 +429,137 @@ export default function CategoryBarChart({
     animationEasing: "ease-out",
   };
 
-  const valueAxisProps = {
-    type: "number",
-    tickFormatter: formatCompact,
-    tick: { className: "az-axis-label" },
-    tickLine: false,
-    axisLine: false,
-  };
-
-  // Horizontal rankings fit every row into the space the card has, thinning
-  // the bars as needed. Only when rows would get too cramped to read (a very
-  // short window) does the list scroll inside the card instead.
-  const AXIS_SPACE = 48;
+  // Rankings fit every row into the space the card has, thinning the bars as
+  // needed. Only when rows would get too cramped to read (a very short window)
+  // does the list scroll inside the card instead.
+  const markers = horizontal ? ranking?.markers || [] : [];
+  const marginTop = markers.length ? 22 : 6;
+  const VERTICAL_SPACE = marginTop + 8;
   const MIN_ROW = 14;
-  const fittedRow = listHeight ? (listHeight - AXIS_SPACE) / Math.max(points.length, 1) : 0;
+  const fittedRow = listHeight ? (listHeight - VERTICAL_SPACE) / Math.max(points.length, 1) : 0;
   const fits = fittedRow >= MIN_ROW;
   const rowHeight = fits ? Math.min(fittedRow, 44) : 24;
   const chartHeight = horizontal
     ? fits
       ? Math.floor(listHeight) - 6 // labels may overhang the SVG edge slightly
-      : points.length * rowHeight + AXIS_SPACE
+      : points.length * rowHeight + VERTICAL_SPACE
     : "100%";
-  const barSize = horizontal ? Math.max(8, Math.min(20, Math.floor(rowHeight * 0.6))) : 48;
+  const barSize = horizontal ? Math.max(8, Math.min(22, Math.floor(rowHeight * 0.62))) : 48;
 
-  const chart = (
+  const tooltip = (
+    <Tooltip
+      cursor={{ fill: CHROME.hover }}
+      wrapperStyle={{ outline: "none", zIndex: 10 }}
+      animationDuration={reducedMotion ? 0 : 150}
+      content={
+        <ChartTooltip
+          categories={categories}
+          stackLabels={stackLabels}
+          net={net}
+          includeVat={includeVat}
+          statusOf={statusOf}
+          shareOf={shareOf}
+        />
+      }
+    />
+  );
+
+  if (horizontal) {
+    // The value axis is hidden (every bar carries its value), but its domain
+    // still includes the markers so they are always on the chart.
+    const domain = [
+      (min) => Math.min(0, min),
+      (max) => Math.max(max, ...markers.map((m) => m.value)) * 1.02,
+    ];
+    return (
+      <div className={`az-plot-scroll${fits ? " is-fitted" : ""}`} ref={listRef}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
+          <BarChart
+            data={points}
+            layout="vertical"
+            barCategoryGap="30%"
+            margin={{ top: marginTop, right: 72, left: 8, bottom: 8 }}
+            accessibilityLayer
+          >
+            {/* Axes must be direct children of the chart: Recharts does not
+                find them inside fragments. */}
+            <XAxis type="number" hide domain={domain} />
+            <YAxis
+              type="category"
+              dataKey="name"
+              width={140}
+              interval={0}
+              tick={<RowTick />}
+              tickLine={false}
+              axisLine={{ stroke: CHROME.baseline }}
+            />
+            {tooltip}
+            {markers.map((marker) => (
+              <ReferenceLine
+                key={marker.value}
+                x={marker.value}
+                stroke={CHROME.budget}
+                strokeDasharray="4 4"
+                ifOverflow="extendDomain"
+                label={{
+                  value: marker.label,
+                  position: "top",
+                  className: "az-axis-label",
+                  offset: 6,
+                }}
+              />
+            ))}
+            <Bar
+              dataKey={totalKey}
+              name="Total"
+              fill={rankFill(0)}
+              barSize={barSize}
+              shape={rankShape}
+              {...animation}
+            >
+              {points.map((point, index) => (
+                <Cell key={`cell-${index}`} fill={rankFill(rowTotal(point))} />
+              ))}
+              {showLabels && <LabelList dataKey={totalKey} content={endLabel} />}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  }
+
+  return (
     <ResponsiveContainer width="100%" height={chartHeight}>
       <BarChart
         data={points}
-        layout={horizontal ? "vertical" : "horizontal"}
+        layout="horizontal"
         stackOffset="sign"
-        barCategoryGap={horizontal ? "30%" : "28%"}
+        barCategoryGap="28%"
         barGap={6}
-        margin={
-          horizontal
-            ? { top: 8, right: 120, left: 8, bottom: 8 }
-            : { top: 28, right: 16, left: 8, bottom: 8 }
-        }
+        margin={{ top: 28, right: 16, left: 8, bottom: 8 }}
         accessibilityLayer
       >
-        <CartesianGrid
-          stroke={CHROME.grid}
-          vertical={horizontal}
-          horizontal={!horizontal}
-        />
+        <CartesianGrid stroke={CHROME.grid} vertical={false} />
         {/* Axes must be direct children of the chart: Recharts does not find
             them inside fragments. */}
-        {horizontal && <XAxis {...valueAxisProps} />}
-        {horizontal && (
-          <YAxis
-            type="category"
-            dataKey="name"
-            width={140}
-            interval={0}
-            tick={<RowTick />}
-            tickLine={false}
-            axisLine={{ stroke: CHROME.baseline }}
-          />
-        )}
-        {!horizontal && (
-          <XAxis
-            dataKey="name"
-            interval={0}
-            height={44}
-            tick={<CategoryTick />}
-            tickLine={false}
-            axisLine={{ stroke: CHROME.baseline }}
-          />
-        )}
-        {!horizontal && <YAxis {...valueAxisProps} width={64} />}
-        <Tooltip
-          cursor={{ fill: CHROME.hover }}
-          wrapperStyle={{ outline: "none", zIndex: 10 }}
-          animationDuration={reducedMotion ? 0 : 150}
-          content={
-            <ChartTooltip
-              categories={categories}
-              stackLabels={stackLabels}
-              net={net}
-              includeVat={includeVat}
-              statusOf={statusOf}
-            />
-          }
+        <XAxis
+          dataKey="name"
+          interval={0}
+          height={44}
+          tick={<CategoryTick />}
+          tickLine={false}
+          axisLine={{ stroke: CHROME.baseline }}
         />
-        {hasNegative &&
-          (horizontal ? (
-            <ReferenceLine x={0} stroke={CHROME.baseline} />
-          ) : (
-            <ReferenceLine y={0} stroke={CHROME.baseline} />
-          ))}
+        <YAxis
+          type="number"
+          width={64}
+          tickFormatter={formatCompact}
+          tick={{ className: "az-axis-label" }}
+          tickLine={false}
+          axisLine={false}
+        />
+        {tooltip}
+        {hasNegative && <ReferenceLine y={0} stroke={CHROME.baseline} />}
         {categories.map((c) => (
           <Bar
             key={c.key}
@@ -477,14 +568,9 @@ export default function CategoryBarChart({
             stackId={c.stack}
             fill={c.color}
             barSize={barSize}
-            shape={segmentShape(c.key, c.stack, horizontal)}
+            shape={segmentShape(c.key, c.stack, false)}
             {...animation}
-          >
-            {statusColor &&
-              points.map((point, index) => (
-                <Cell key={`cell-${index}`} fill={statusColor(point[`__total_${c.stack}`])} />
-              ))}
-          </Bar>
+          />
         ))}
         {stacks.map((stack) => (
           <Bar
@@ -501,13 +587,5 @@ export default function CategoryBarChart({
         ))}
       </BarChart>
     </ResponsiveContainer>
-  );
-
-  return horizontal ? (
-    <div className={`az-plot-scroll${fits ? " is-fitted" : ""}`} ref={listRef}>
-      {chart}
-    </div>
-  ) : (
-    chart
   );
 }

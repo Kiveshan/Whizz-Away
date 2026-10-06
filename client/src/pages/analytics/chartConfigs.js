@@ -1,5 +1,3 @@
-import { calculateStatus } from "./AnalyticsFunctions.js";
-
 // Colours. Each category keeps one colour on every chart (a category's colour
 // follows the category, never its position). The expense hues are ordered so
 // neighbouring stacked segments stay distinguishable, including for colour-blind
@@ -17,6 +15,8 @@ const COLOR = {
 };
 const AGING_RAMP = ["#86b6ef", "#3987e5", "#1c5cab", "#0d366b"];
 export const STATUS = { good: "#0ca30c", warning: "#fab219", critical: "#d03b3b" };
+// Plain bars for a ranking whose flagged rows are the point (fuel bands).
+const RANK_NEUTRAL = "#b4b2aa";
 
 const CATEGORY = {
   invoices: { label: "Invoices", color: COLOR.blue },
@@ -86,11 +86,20 @@ const rankingTiles = (totalLabel) => (t) => {
   const total = t.stack("all");
   return [
     { label: totalLabel, value: total, format: "money" },
-    { label: "Trucks", value: t.count, format: "count" },
-    { label: "Average per truck", value: t.count ? total / t.count : 0, format: "money" },
+    {
+      label: "Average per truck",
+      value: t.count ? total / t.count : 0,
+      format: "money",
+      note: `${t.count} truck${t.count === 1 ? "" : "s"}`,
+    },
     top && { label: "Highest", value: top.total, format: "money", note: top.name },
   ].filter(Boolean);
 };
+
+// Fuel per truck for the month: over R50,000 is flagged, under R15,000 is low,
+// anything in between is average.
+const FUEL_HIGH = 50000;
+const FUEL_LOW = 15000;
 
 // Report navigation, in display order.
 export const REPORT_GROUPS = [
@@ -113,42 +122,46 @@ export const REPORT_GROUPS = [
   },
 ];
 
-// Each chart starts on the VAT basis it showed before the toggle existed
-// (turnover-based charts were VAT-inclusive; truck, fuel and expense charts
-// were VAT-exclusive). The toggle choice is then remembered per chart.
+// Every chart starts on Incl. VAT; the toggle choice is then remembered per chart.
 //
 //   categories    which categories are stacked, and into which stack
 //   stackLabels   names for side-by-side stacks (legend groups, tooltip, table)
 //   totals        with no truck selected, collapse all trucks into one row
-//   horizontal    rank many rows as horizontal bars (long truck lists)
+//   horizontal    rank many rows as horizontal bars (long truck lists): one
+//                 single-colour bar per row (its total), value at the end; the
+//                 category split is in the tooltip and table
+//   ranking       bar colour for a ranking, optional colours above / below a
+//                 value, and dashed marker lines
 //   filter        which extra filter the chart uses: client | subcontractor | truck
 export const CHARTS = {
   fuel: {
     title: "Fuel per Truck",
-    description: "Fuel spend per truck for the month, coloured by spend band.",
+    description: "Fuel spend per truck for the month. Red is over R50,000, green is under R15,000, grey is average.",
     noun: "fuel",
-    defaultIncludeVat: false,
     categories: inStack("all", "fuel"),
     horizontal: true,
     showShare: true,
-    statusColor: (total) =>
-      ({ good: STATUS.good, warning: STATUS.warning, bad: STATUS.critical })[calculateStatus(total)],
-    statusLabel: (total) =>
-      ({ good: "Good spend", warning: "Warning: spend above R3,500", bad: "High spend: above R4,500" })[
-        calculateStatus(total)
+    ranking: {
+      color: RANK_NEUTRAL,
+      above: { value: FUEL_HIGH, color: STATUS.critical },
+      below: { value: FUEL_LOW, color: STATUS.good },
+      markers: [
+        { value: FUEL_LOW, label: "R15k" },
+        { value: FUEL_HIGH, label: "R50k" },
       ],
-    legendItems: [
-      { label: "Good · up to R3,500", color: STATUS.good },
-      { label: "Warning · R3,501 – R4,500", color: STATUS.warning },
-      { label: "High · over R4,500", color: STATUS.critical },
-    ],
+    },
+    statusLabel: (total) =>
+      total > FUEL_HIGH
+        ? "Exceeds R50,000"
+        : total < FUEL_LOW
+          ? "Under R15,000"
+          : "Average (R15,000 – R50,000)",
     tiles: rankingTiles("Total fuel"),
   },
   turnoverPerMonth: {
     title: "Turnover per Month vs Client",
     description: "Invoices and add-ons less credit notes — for all clients, or compare one client.",
     noun: "turnover",
-    defaultIncludeVat: true,
     categories: inStack("all", ...TURNOVER),
     filter: "client",
     tiles: (t) => [
@@ -161,7 +174,6 @@ export const CHARTS = {
     title: "Debtors Age Analysis",
     description: "What clients owed at the close of the previous month, by how long it has been outstanding.",
     noun: "aging analysis",
-    defaultIncludeVat: true,
     // Each bucket in its own stack, so the buckets are separate bars side by side.
     categories: ["current", "thirtyDays", "sixtyDays", "ninetyDays"].flatMap((key) =>
       inStack(key, key)
@@ -186,7 +198,6 @@ export const CHARTS = {
     title: "Subbie vs Turnover",
     description: "One subcontractor's share of turnover against total turnover.",
     noun: "subbie vs turnover",
-    defaultIncludeVat: true,
     categories: inStack("all", ...TRUCK_INCOME, "subcontractorTurnover"),
     filter: "subcontractor",
     tiles: comparisonTiles("Total turnover", "Subcontractor"),
@@ -195,7 +206,6 @@ export const CHARTS = {
     title: "Turnover vs Total Subbie",
     description: "All subcontractors' share of turnover against total turnover.",
     noun: "turnover vs total subcontractor",
-    defaultIncludeVat: true,
     categories: inStack("all", ...TRUCK_INCOME, "subcontractorTurnover"),
     tiles: comparisonTiles("Total turnover", "Subcontractor"),
   },
@@ -203,7 +213,6 @@ export const CHARTS = {
     title: "Wages vs Expenses",
     description: "Monthly wages against fuel, parts and subcontractor costs.",
     noun: "wages vs expenses",
-    defaultIncludeVat: false,
     categories: inStack("all", "wages", "fuel", "parts", "subcontractors"),
     tiles: (t) => {
       const wages = t.row(0);
@@ -220,7 +229,6 @@ export const CHARTS = {
     title: "Turnover vs Diesel Cost",
     description: "Turnover for the month against what was spent on diesel.",
     noun: "turnover vs diesel cost",
-    defaultIncludeVat: true,
     categories: [...inStack("turnover", ...TURNOVER), ...inStack("diesel", "fuel")],
     stackLabels: { turnover: "Turnover", diesel: "Diesel" },
     tiles: (t) => [
@@ -237,17 +245,16 @@ export const CHARTS = {
     title: "Turnover per Truck",
     description: "What each truck earned this month, split by the work it did.",
     noun: "turnover per truck",
-    defaultIncludeVat: false,
     categories: inStack("all", ...TRUCK_INCOME),
     horizontal: true,
     showShare: true,
+    ranking: { color: COLOR.blue },
     tiles: rankingTiles("Total turnover"),
   },
   incomeVsExpense: {
     title: "Income vs Expenses",
     description: "Turnover against every cost for the month, with the net result.",
     noun: "income vs expenses",
-    defaultIncludeVat: true,
     categories: inStack("all", ...TURNOVER, "fuel", "parts", "subcontractors", "wages"),
     tiles: netTiles(
       (t) => t.row(0),
@@ -258,7 +265,6 @@ export const CHARTS = {
     title: "Turnover vs Subbie Expense",
     description: "Turnover against what one subcontractor was paid for the month.",
     noun: "turnover vs subbie expense",
-    defaultIncludeVat: true,
     categories: inStack("all", ...TURNOVER, "subcontractorExpense"),
     filter: "subcontractor",
     tiles: comparisonTiles("Total turnover", "Subcontractor"),
@@ -267,7 +273,6 @@ export const CHARTS = {
     title: "Turnover per Truck vs Diesel",
     description: "Truck turnover against diesel — all trucks together, or pick one.",
     noun: "turnover vs fuel per truck",
-    defaultIncludeVat: false,
     categories: [...inStack("turnover", ...TRUCK_INCOME), ...inStack("fuel", "fuel")],
     stackLabels: { turnover: "Turnover", fuel: "Diesel" },
     totals: "All trucks",
@@ -286,7 +291,6 @@ export const CHARTS = {
     title: "Truck Income vs Expenses",
     description: "Truck income against fuel and maintenance — all trucks together, or pick one.",
     noun: "truck income vs expense",
-    defaultIncludeVat: false,
     categories: [
       ...inStack("income", ...TRUCK_INCOME),
       ...inStack("expense", "fuel", "maintenance"),
@@ -304,7 +308,6 @@ export const CHARTS = {
     title: "Payments Received",
     description: "Payments received in the month, by what they settled.",
     noun: "payments received",
-    defaultIncludeVat: true,
     categories: inStack("all", "invoicePayments", "addonPayments", "otherPayments"),
     filter: "paymentClient",
     tiles: (t) => [

@@ -88,7 +88,7 @@ export default function DirectorAnalytics() {
   const wrapperRef = useRef(null);
 
   const chart = CHARTS[activeFilter];
-  const [includeVat, setIncludeVat] = useVatToggle(activeFilter, chart?.defaultIncludeVat ?? true);
+  const [includeVat, setIncludeVat] = useVatToggle(activeFilter);
 
   useEffect(() => {
     fetchClients(setClients, setError);
@@ -258,11 +258,14 @@ export default function DirectorAnalytics() {
         <KpiTiles tiles={tiles} />
         {view === "chart" ? (
           <>
-            <ChartLegend
-              categories={chart.categories}
-              stackLabels={chart.stackLabels}
-              legendItems={chart.legendItems}
-            />
+            {/* Rankings are single-colour bars, so they need no legend */}
+            {!chart.horizontal && (
+              <ChartLegend
+                categories={chart.categories}
+                stackLabels={chart.stackLabels}
+                legendItems={chart.legendItems}
+              />
+            )}
             <div className={`az-plot${chart.horizontal ? " is-horizontal" : ""}`}>
               <CategoryBarChart
                 points={points}
@@ -271,8 +274,8 @@ export default function DirectorAnalytics() {
                 stackLabels={chart.stackLabels}
                 net={chart.net}
                 horizontal={chart.horizontal}
+                ranking={chart.ranking}
                 showShare={chart.showShare}
-                statusColor={chart.statusColor}
                 statusLabel={chart.statusLabel}
               />
             </div>
@@ -285,6 +288,8 @@ export default function DirectorAnalytics() {
             net={chart.net}
             includeVat={includeVat}
             totalsRow={!!chart.horizontal}
+            showShare={chart.showShare}
+            statusLabel={chart.statusLabel}
           />
         )}
       </div>

@@ -196,13 +196,25 @@ export function ChartLegend({ categories, stackLabels, legendItems }) {
 // The same numbers as the chart, readable without hovering.
 // totalsRow: add a Total footer — only meaningful when rows are parts of a whole
 // (e.g. one row per truck), not when they compare a part with its total.
-export function DataTable({ points, categories, stackLabels, net, includeVat, totalsRow = false }) {
+// showShare: add each row's share of the total. statusLabel: (total) => text,
+// a Status column (e.g. which trucks are over the fuel threshold).
+export function DataTable({
+  points,
+  categories,
+  stackLabels,
+  net,
+  includeVat,
+  totalsRow = false,
+  showShare = false,
+  statusLabel,
+}) {
   const stacks = stacksOf(categories);
   const stackColumns = stackLabels
     ? stacks.map((stack) => ({ key: `__total_${stack}`, label: stackLabels[stack] }))
     : [];
   const needsTotal = !stackLabels && (stacks.length > 1 || categories.length > 1);
   const rowTotal = (point) => stacks.reduce((sum, s) => sum + point[`__total_${s}`], 0);
+  const grand = points.reduce((sum, point) => sum + rowTotal(point), 0);
   const netOf = (point) =>
     point[`__total_${net.plus}`] - net.minus.reduce((sum, s) => sum + point[`__total_${s}`], 0);
 
@@ -211,8 +223,18 @@ export function DataTable({ points, categories, stackLabels, net, includeVat, to
     ...stackColumns.map((col) => ({ ...col, strong: true, get: (p) => p[col.key] })),
     ...(needsTotal ? [{ key: "__rowTotal", label: "Total", strong: true, get: rowTotal }] : []),
     ...(net ? [{ key: "__net", label: "Net", strong: true, get: netOf }] : []),
+    ...(showShare
+      ? [{ key: "__share", label: "Share", format: "percent", get: (p) => (grand ? (rowTotal(p) / grand) * 100 : 0) }]
+      : []),
+    ...(statusLabel
+      ? [{ key: "__status", label: "Status", format: "text", get: (p) => statusLabel(rowTotal(p)) }]
+      : []),
   ];
   const footer = totalsRow && points.length > 1;
+  const show = (col, value) =>
+    col.format === "percent" ? `${value.toFixed(1)}%` : col.format === "text" ? value : formatRand(value);
+  const footerValue = (col) =>
+    col.format === "text" ? "" : show(col, points.reduce((sum, point) => sum + col.get(point), 0));
 
   return (
     <div className="az-table-wrap">
@@ -224,7 +246,7 @@ export function DataTable({ points, categories, stackLabels, net, includeVat, to
           <tr>
             <th scope="col">Name</th>
             {columns.map((col) => (
-              <th scope="col" key={col.key} className="is-number">
+              <th scope="col" key={col.key} className={col.format === "text" ? "" : "is-number"}>
                 {col.color && <span className="az-legend-swatch" style={{ backgroundColor: col.color }} />}
                 {col.label}
               </th>
@@ -236,8 +258,11 @@ export function DataTable({ points, categories, stackLabels, net, includeVat, to
             <tr key={point.name}>
               <th scope="row">{point.name}</th>
               {columns.map((col) => (
-                <td key={col.key} className={`is-number${col.strong ? " is-strong" : ""}`}>
-                  {formatRand(col.get(point))}
+                <td
+                  key={col.key}
+                  className={`${col.format === "text" ? "" : "is-number"}${col.strong ? " is-strong" : ""}`}
+                >
+                  {show(col, col.get(point))}
                 </td>
               ))}
             </tr>
@@ -248,8 +273,8 @@ export function DataTable({ points, categories, stackLabels, net, includeVat, to
             <tr>
               <th scope="row">Total</th>
               {columns.map((col) => (
-                <td key={col.key} className="is-number is-strong">
-                  {formatRand(points.reduce((sum, point) => sum + col.get(point), 0))}
+                <td key={col.key} className={col.format === "text" ? "" : "is-number is-strong"}>
+                  {footerValue(col)}
                 </td>
               ))}
             </tr>

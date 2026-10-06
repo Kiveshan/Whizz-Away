@@ -1,12 +1,5 @@
 import api from "../../api.js";
 
-// Utility Functions
-export const calculateStatus = (cost) => {
-  if (cost <= 3500) return "good";
-  if (cost <= 4500) return "warning";
-  return "bad";
-};
-
 // Dropdown data
 export const fetchClients = async (setClients, setError) => {
   try {
