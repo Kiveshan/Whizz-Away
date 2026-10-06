@@ -68,9 +68,11 @@ export default function DirectorAnalytics() {
   const [activeYear, setActiveYear] = useState(currentDate.getFullYear().toString());
   const [activeFilter, setActiveFilter] = useState("fuel");
   const [chartData, setChartData] = useState([]);
-  // Which report the loaded data belongs to, so a refetch can keep showing the
-  // current chart (dimmed) instead of flashing empty.
-  const [dataFilter, setDataFilter] = useState(null);
+  // Which report (and truck) the loaded data belongs to, so a refetch can keep
+  // showing the current chart (dimmed) instead of flashing empty — and so the
+  // "All trucks" grouping follows the data on screen, not the dropdown, which
+  // changes before the new data arrives.
+  const [dataScope, setDataScope] = useState({ filter: null, truck: "" });
   const [clients, setClients] = useState([]);
   const [subcontractors, setSubcontractors] = useState([]);
   const [trucks, setTrucks] = useState([]);
@@ -140,7 +142,7 @@ export default function DirectorAnalytics() {
         const data = loaders[activeFilter] ? await loaders[activeFilter]() : [];
         if (isMounted) {
           setChartData(data);
-          setDataFilter(activeFilter);
+          setDataScope({ filter: activeFilter, truck: selectedTruck });
         }
       } catch (err) {
         if (isMounted) setError(`Failed to load data: ${err.message}`);
@@ -201,8 +203,8 @@ export default function DirectorAnalytics() {
   // Rows for the current report: truck charts show one "All trucks" row until a
   // single truck is chosen; rankings are ordered largest first.
   const rows = (() => {
-    if (!chart || dataFilter !== activeFilter) return [];
-    if (chart.totals && !selectedTruck && chartData.length) {
+    if (!chart || dataScope.filter !== activeFilter) return [];
+    if (chart.totals && !dataScope.truck && chartData.length) {
       return collapseRows(chartData, chart.totals);
     }
     return chartData;
