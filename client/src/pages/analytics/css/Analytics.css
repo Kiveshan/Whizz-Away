@@ -506,7 +506,8 @@ body.no-vertical-scroll {
 .analytics-page-wrapper .az-plot {
   position: relative;
   flex: 1;
-  min-height: 240px;
+  /* The plot takes whatever height is left so the report always fits the window */
+  min-height: 0;
 }
 
 .analytics-page-wrapper .az-plot.is-horizontal {
@@ -521,6 +522,11 @@ body.no-vertical-scroll {
   overflow-x: hidden;
   scrollbar-width: thin;
   scrollbar-color: #cdd5e0 transparent;
+}
+
+/* When every row fits, there is nothing to scroll */
+.analytics-page-wrapper .az-plot-scroll.is-fitted {
+  overflow-y: hidden;
 }
 
 .analytics-page-wrapper .az-axis-label {
@@ -836,10 +842,139 @@ body.no-vertical-scroll {
   }
 }
 
-/* Narrow or short screens: there isn't room to fit the whole report in the
-   window, so the page scrolls and the report card sizes to its content
-   (the chart keeps a full height and its axis is never clipped). */
-@media (max-width: 900px), (max-height: 860px) {
+/* PC screens always fit the report in the window — no page scroll. On shorter
+   screens the chrome tightens (labels, description, figure notes, spacing) so
+   the chart keeps as much height as possible. */
+@media (min-width: 901px) and (max-height: 900px) {
+  .analytics-page-wrapper .az-layout {
+    gap: 14px;
+    padding-bottom: 2px;
+  }
+
+  .analytics-page-wrapper .az-main {
+    gap: 10px;
+  }
+
+  .analytics-page-wrapper .az-sidebar {
+    padding: 10px 8px;
+  }
+
+  .analytics-page-wrapper .az-nav-group + .az-nav-group {
+    margin-top: 8px;
+  }
+
+  .analytics-page-wrapper .az-nav-item {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+
+  /* Field labels move off-screen (still read by screen readers); the selects
+     already show what they hold — "August", "2026", "All trucks". */
+  .analytics-page-wrapper .az-field > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .analytics-page-wrapper .az-field select {
+    height: 34px;
+  }
+
+  .analytics-page-wrapper .az-card {
+    padding: 12px 16px 10px;
+  }
+
+  .analytics-page-wrapper .az-card-desc {
+    display: none;
+  }
+
+  .analytics-page-wrapper .az-card-title {
+    font-size: 16px;
+  }
+
+  .analytics-page-wrapper .az-segmented button {
+    padding: 4px 12px;
+  }
+
+  .analytics-page-wrapper .az-card-body {
+    margin-top: 10px;
+  }
+
+  .analytics-page-wrapper .az-content {
+    gap: 10px;
+  }
+
+  .analytics-page-wrapper .az-tiles {
+    gap: 10px;
+  }
+
+  .analytics-page-wrapper .az-tile {
+    padding: 7px 12px;
+  }
+
+  .analytics-page-wrapper .az-tile-value {
+    margin: 1px 0 0;
+    font-size: 19px;
+  }
+
+  .analytics-page-wrapper .az-tile-note {
+    display: none;
+  }
+}
+
+/* Keep the whole report list visible too */
+@media (min-width: 901px) and (max-height: 820px) {
+  .analytics-page-wrapper .az-sidebar {
+    padding: 8px 8px;
+  }
+
+  .analytics-page-wrapper .az-nav-group + .az-nav-group {
+    margin-top: 6px;
+  }
+
+  .analytics-page-wrapper .az-nav-heading {
+    margin-bottom: 2px;
+  }
+
+  .analytics-page-wrapper .az-nav-item {
+    padding: 4px 12px;
+    line-height: 1.25;
+  }
+}
+
+@media (min-width: 901px) and (max-height: 720px) {
+  .analytics-page-wrapper .az-nav-heading {
+    font-size: 10.5px;
+  }
+
+  .analytics-page-wrapper .az-nav-item {
+    padding: 3px 10px;
+    font-size: 12.5px;
+  }
+
+  .analytics-page-wrapper .az-tile {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 12px;
+  }
+
+  .analytics-page-wrapper .az-tile-value {
+    font-size: 17px;
+  }
+
+  .analytics-page-wrapper .az-legend {
+    font-size: 12px;
+  }
+}
+
+/* Phones and narrow windows: the report can't fit beside a report list, so
+   the page scrolls and the report card sizes to its content. */
+@media (max-width: 900px) {
   body.no-vertical-scroll,
   html.no-vertical-scroll {
     height: auto;
@@ -876,15 +1011,6 @@ body.no-vertical-scroll {
 
   .analytics-page-wrapper .az-table-wrap {
     max-height: 460px;
-  }
-}
-
-/* Short but wide: keep the report list beside the report while it scrolls */
-@media (min-width: 901px) and (max-height: 860px) {
-  .analytics-page-wrapper .az-sidebar {
-    position: sticky;
-    top: 12px;
-    max-height: calc(100vh - 88px);
   }
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -80,6 +80,20 @@ export function useVatToggle(chartKey, defaultIncludeVat) {
   };
 
   return [includeVat, setIncludeVat];
+}
+
+// Height of an element, kept up to date as the window resizes.
+function useElementHeight() {
+  const ref = useRef(null);
+  const [height, setHeight] = useState(0);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(([entry]) => setHeight(entry.contentRect.height));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  return [ref, height];
 }
 
 const reducedMotionQuery = "(prefers-reduced-motion: reduce)";
@@ -320,6 +334,7 @@ export default function CategoryBarChart({
   statusLabel,
 }) {
   const reducedMotion = usePrefersReducedMotion();
+  const [listRef, listHeight] = useElementHeight();
   const stacks = stacksOf(categories);
   const barCount = points.length * stacks.length;
   const grandTotal = points.reduce(
@@ -374,8 +389,20 @@ export default function CategoryBarChart({
     axisLine: false,
   };
 
-  const rowHeight = 38;
-  const chartHeight = horizontal ? Math.max(points.length * rowHeight + 48, 220) : "100%";
+  // Horizontal rankings fit every row into the space the card has, thinning
+  // the bars as needed. Only when rows would get too cramped to read (a very
+  // short window) does the list scroll inside the card instead.
+  const AXIS_SPACE = 48;
+  const MIN_ROW = 14;
+  const fittedRow = listHeight ? (listHeight - AXIS_SPACE) / Math.max(points.length, 1) : 0;
+  const fits = fittedRow >= MIN_ROW;
+  const rowHeight = fits ? Math.min(fittedRow, 44) : 24;
+  const chartHeight = horizontal
+    ? fits
+      ? Math.floor(listHeight) - 6 // labels may overhang the SVG edge slightly
+      : points.length * rowHeight + AXIS_SPACE
+    : "100%";
+  const barSize = horizontal ? Math.max(8, Math.min(20, Math.floor(rowHeight * 0.6))) : 48;
 
   const chart = (
     <ResponsiveContainer width="100%" height={chartHeight}>
@@ -449,7 +476,7 @@ export default function CategoryBarChart({
             name={c.label}
             stackId={c.stack}
             fill={c.color}
-            barSize={horizontal ? 20 : 48}
+            barSize={barSize}
             shape={segmentShape(c.key, c.stack, horizontal)}
             {...animation}
           >
@@ -466,7 +493,7 @@ export default function CategoryBarChart({
             stackId={stack}
             fill="transparent"
             legendType="none"
-            barSize={horizontal ? 20 : 48}
+            barSize={barSize}
             isAnimationActive={false}
           >
             {showLabels && <LabelList dataKey={`__top_${stack}`} content={capLabel(stack)} />}
@@ -476,5 +503,11 @@ export default function CategoryBarChart({
     </ResponsiveContainer>
   );
 
-  return horizontal ? <div className="az-plot-scroll">{chart}</div> : chart;
+  return horizontal ? (
+    <div className={`az-plot-scroll${fits ? " is-fitted" : ""}`} ref={listRef}>
+      {chart}
+    </div>
+  ) : (
+    chart
+  );
 }
