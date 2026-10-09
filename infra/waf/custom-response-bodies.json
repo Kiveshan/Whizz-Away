@@ -1,0 +1,6 @@
+{
+  "rate_limited": {
+    "ContentType": "APPLICATION_JSON",
+    "Content": "{\"error\":\"Too many attempts\",\"message\":\"Too many attempts from this address. Please try again in a few minutes.\",\"code\":\"RATE_LIMITED\"}"
+  }
+}

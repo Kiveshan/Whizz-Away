@@ -1,0 +1,37 @@
+[
+  {
+    "Namespace": "aws:elasticbeanstalk:command",
+    "OptionName": "DeploymentPolicy",
+    "Value": "Immutable"
+  },
+  {
+    "Namespace": "aws:autoscaling:updatepolicy:rollingupdate",
+    "OptionName": "RollingUpdateEnabled",
+    "Value": "true"
+  },
+  {
+    "Namespace": "aws:autoscaling:updatepolicy:rollingupdate",
+    "OptionName": "RollingUpdateType",
+    "Value": "Immutable"
+  },
+  {
+    "Namespace": "aws:elasticbeanstalk:healthreporting:system",
+    "OptionName": "ConfigDocument",
+    "Value": "{\"Version\":1,\"CloudWatchMetrics\":{\"Instance\":{},\"Environment\":{}},\"Rules\":{\"Environment\":{\"ELB\":{\"ELBRequests4xx\":{\"Enabled\":false}},\"Application\":{\"ApplicationRequests4xx\":{\"Enabled\":false}}}}}"
+  },
+  {
+    "Namespace": "aws:elasticbeanstalk:cloudwatch:logs",
+    "OptionName": "StreamLogs",
+    "Value": "true"
+  },
+  {
+    "Namespace": "aws:elasticbeanstalk:cloudwatch:logs",
+    "OptionName": "RetentionInDays",
+    "Value": "30"
+  },
+  {
+    "Namespace": "aws:elasticbeanstalk:cloudwatch:logs",
+    "OptionName": "DeleteOnTerminate",
+    "Value": "false"
+  }
+]

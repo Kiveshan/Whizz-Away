@@ -1,0 +1,148 @@
+[
+  {
+    "Name": "BlockUnknownHost",
+    "Priority": 0,
+    "Statement": {
+      "NotStatement": {
+        "Statement": {
+          "OrStatement": {
+            "Statements": [
+              {
+                "ByteMatchStatement": {
+                  "SearchString": "ksm-whizz-away.co.za",
+                  "FieldToMatch": { "SingleHeader": { "Name": "host" } },
+                  "TextTransformations": [{ "Priority": 0, "Type": "LOWERCASE" }],
+                  "PositionalConstraint": "EXACTLY"
+                }
+              },
+              {
+                "ByteMatchStatement": {
+                  "SearchString": "www.ksm-whizz-away.co.za",
+                  "FieldToMatch": { "SingleHeader": { "Name": "host" } },
+                  "TextTransformations": [{ "Priority": 0, "Type": "LOWERCASE" }],
+                  "PositionalConstraint": "EXACTLY"
+                }
+              },
+              {
+                "ByteMatchStatement": {
+                  "SearchString": "whizz-away.af-south-1.elasticbeanstalk.com",
+                  "FieldToMatch": { "SingleHeader": { "Name": "host" } },
+                  "TextTransformations": [{ "Priority": 0, "Type": "LOWERCASE" }],
+                  "PositionalConstraint": "EXACTLY"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "Action": { "Count": {} },
+    "VisibilityConfig": {
+      "SampledRequestsEnabled": true,
+      "CloudWatchMetricsEnabled": true,
+      "MetricName": "BlockUnknownHost"
+    }
+  },
+  {
+    "Name": "AuthRateLimit",
+    "Priority": 1,
+    "Statement": {
+      "RateBasedStatement": {
+        "Limit": 100,
+        "EvaluationWindowSec": 300,
+        "AggregateKeyType": "IP",
+        "ScopeDownStatement": {
+          "OrStatement": {
+            "Statements": [
+              {
+                "ByteMatchStatement": {
+                  "SearchString": "/login",
+                  "FieldToMatch": { "UriPath": {} },
+                  "TextTransformations": [{ "Priority": 0, "Type": "LOWERCASE" }],
+                  "PositionalConstraint": "STARTS_WITH"
+                }
+              },
+              {
+                "ByteMatchStatement": {
+                  "SearchString": "/register",
+                  "FieldToMatch": { "UriPath": {} },
+                  "TextTransformations": [{ "Priority": 0, "Type": "LOWERCASE" }],
+                  "PositionalConstraint": "STARTS_WITH"
+                }
+              },
+              {
+                "ByteMatchStatement": {
+                  "SearchString": "/check-email",
+                  "FieldToMatch": { "UriPath": {} },
+                  "TextTransformations": [{ "Priority": 0, "Type": "LOWERCASE" }],
+                  "PositionalConstraint": "STARTS_WITH"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "Action": {
+      "Block": {
+        "CustomResponse": {
+          "ResponseCode": 429,
+          "CustomResponseBodyKey": "rate_limited"
+        }
+      }
+    },
+    "VisibilityConfig": {
+      "SampledRequestsEnabled": true,
+      "CloudWatchMetricsEnabled": true,
+      "MetricName": "AuthRateLimit"
+    }
+  },
+  {
+    "Name": "AWS-IpReputationList",
+    "Priority": 2,
+    "Statement": {
+      "ManagedRuleGroupStatement": {
+        "VendorName": "AWS",
+        "Name": "AWSManagedRulesAmazonIpReputationList"
+      }
+    },
+    "OverrideAction": { "None": {} },
+    "VisibilityConfig": {
+      "SampledRequestsEnabled": true,
+      "CloudWatchMetricsEnabled": true,
+      "MetricName": "AWS-IpReputationList"
+    }
+  },
+  {
+    "Name": "AWS-KnownBadInputs",
+    "Priority": 3,
+    "Statement": {
+      "ManagedRuleGroupStatement": {
+        "VendorName": "AWS",
+        "Name": "AWSManagedRulesKnownBadInputsRuleSet"
+      }
+    },
+    "OverrideAction": { "None": {} },
+    "VisibilityConfig": {
+      "SampledRequestsEnabled": true,
+      "CloudWatchMetricsEnabled": true,
+      "MetricName": "AWS-KnownBadInputs"
+    }
+  },
+  {
+    "Name": "AWS-CommonRuleSet",
+    "Priority": 4,
+    "Statement": {
+      "ManagedRuleGroupStatement": {
+        "VendorName": "AWS",
+        "Name": "AWSManagedRulesCommonRuleSet"
+      }
+    },
+    "OverrideAction": { "Count": {} },
+    "VisibilityConfig": {
+      "SampledRequestsEnabled": true,
+      "CloudWatchMetricsEnabled": true,
+      "MetricName": "AWS-CommonRuleSet"
+    }
+  }
+]
