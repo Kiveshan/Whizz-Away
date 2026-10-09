@@ -89,9 +89,15 @@ const sessionConfig = {
   name: "whizzaway.sid", // Custom session cookie name
 };
 
-// In production, trust the first proxy
+// Behind ALB -> nginx on Elastic Beanstalk: trust both hops so req.ip is the
+// real client IP. Without this every request appears to come from nginx
+// (127.0.0.1) and the per-IP auth rate limiter becomes one global bucket.
+// EB sets NODE_ENV=deployed, not production.
+if (process.env.NODE_ENV === "production" || process.env.NODE_ENV === "deployed") {
+  app.set("trust proxy", 2);
+}
+
 if (process.env.NODE_ENV === "production") {
-  app.set("trust proxy", 1);
   sessionConfig.cookie.secure = true;
 }
 
