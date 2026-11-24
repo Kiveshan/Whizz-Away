@@ -10,7 +10,7 @@ const CustomAlert = ({ message, onClose, type = "info" }) => {
       case "warning":
         return "custom-alert warning"
       default:
-        return "custom-alert"
+        return "custom-alert info"
     }
   }
 

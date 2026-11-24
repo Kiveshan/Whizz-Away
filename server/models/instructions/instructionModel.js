@@ -1,5 +1,22 @@
 import { pool, query } from "../../config/database.js";
 
+// Route matching for m5_client_rate lookups. Instructions store pickup/dropoff
+// as free text copied from the rate dropdown, so a plain `starting_point = $2`
+// match silently misses when the two differ only in spacing or case — e.g.
+// 'Empty Depot To PLP SA PMB ' vs '... PMB' left instruction 2042 with VGM R0.
+//
+// MATCH: ignore spacing/case. norm_route() is defined in migration 008
+// (unicode spaces -> space, runs collapsed, trimmed).
+// ORDER: an exact-text match still wins. Some clients have duplicate routes
+// that differ only in spacing but carry DIFFERENT prices (e.g. 'Terminal'
+// R2,022.93 vs 'Terminal ' R3,030.38); preferring the exact row keeps existing
+// instructions on the rate they have always used. The normalized match is only
+// a fallback for when no exact row exists.
+// Both expect $2 = pickup/starting point and $3 = dropoff/destination.
+const CLIENT_ROUTE_MATCH_SQL = `lower(public.norm_route(starting_point)) = lower(public.norm_route($2))
+              AND lower(public.norm_route(destination)) = lower(public.norm_route($3))`;
+const CLIENT_ROUTE_ORDER_SQL = `(starting_point = $2 AND destination = $3) DESC NULLS LAST, client_rate_id DESC`;
+
 // Fallback total-cost calculation, used only when the controller did not
 // supply a server-calculated total_cost. Derives the total from the submitted
 // rate inputs — never from a client-precomputed total.
@@ -579,9 +596,8 @@ export const saveInstruction = async ({
             SELECT surcharges, surcharge12m
             FROM public.m5_client_rate
             WHERE clientid = $1
-              AND starting_point = $2
-              AND destination = $3
-            ORDER BY client_rate_id DESC
+              AND ${CLIENT_ROUTE_MATCH_SQL}
+            ORDER BY ${CLIENT_ROUTE_ORDER_SQL}
             LIMIT 1
           `;
           const surchargeResult = await client.query(surchargeQuery, [
@@ -612,9 +628,8 @@ export const saveInstruction = async ({
             SELECT hazardous
             FROM public.m5_client_rate
             WHERE clientid = $1
-              AND starting_point = $2
-              AND destination = $3
-            ORDER BY client_rate_id DESC
+              AND ${CLIENT_ROUTE_MATCH_SQL}
+            ORDER BY ${CLIENT_ROUTE_ORDER_SQL}
             LIMIT 1
           `;
           const hazardousResult = await client.query(hazardousQuery, [
@@ -647,9 +662,8 @@ export const saveInstruction = async ({
             SELECT vgm
             FROM public.m5_client_rate
             WHERE clientid = $1
-              AND starting_point = $2
-              AND destination = $3
-            ORDER BY client_rate_id DESC
+              AND ${CLIENT_ROUTE_MATCH_SQL}
+            ORDER BY ${CLIENT_ROUTE_ORDER_SQL}
             LIMIT 1
           `;
           const vgmResult = await client.query(vgmQuery, [
@@ -1482,12 +1496,18 @@ export const getActiveClients = async () => {
 };
 
 export const getClientStartingPoints = async (clientId) => {
+  // One entry per normalized route name, so 'X' and 'X ' no longer show up as
+  // two identical-looking options that resolve to different rate rows.
   const sql = `
-    SELECT DISTINCT starting_point
-    FROM public.m5_client_rate
-    WHERE clientid = $1 
-      AND starting_point IS NOT NULL 
-      AND starting_point IS DISTINCT FROM ''
+    SELECT starting_point
+    FROM (
+      SELECT DISTINCT ON (lower(public.norm_route(starting_point)))
+        public.norm_route(starting_point) AS starting_point
+      FROM public.m5_client_rate
+      WHERE clientid = $1
+        AND public.norm_route(starting_point) <> ''
+      ORDER BY lower(public.norm_route(starting_point)), client_rate_id DESC
+    ) s
     ORDER BY starting_point
   `;
   console.log(`[MODEL] Executing query for client ${clientId}:`, sql);
@@ -1515,12 +1535,16 @@ export const getClientDestinations = async (clientId, startingPoint) => {
   }
 
   const sql = `
-    SELECT DISTINCT destination
-    FROM public.m5_client_rate
-    WHERE clientid = $1 
-      AND starting_point = $2
-      AND destination IS NOT NULL 
-      AND destination != ''
+    SELECT destination
+    FROM (
+      SELECT DISTINCT ON (lower(public.norm_route(destination)))
+        public.norm_route(destination) AS destination
+      FROM public.m5_client_rate
+      WHERE clientid = $1
+        AND lower(public.norm_route(starting_point)) = lower(public.norm_route($2))
+        AND public.norm_route(destination) <> ''
+      ORDER BY lower(public.norm_route(destination)), client_rate_id DESC
+    ) d
     ORDER BY destination
   `;
 
@@ -1592,9 +1616,8 @@ export const getClientRates = async (clientId, start, destination) => {
       destination
     FROM public.m5_client_rate
     WHERE clientid = $1
-      AND starting_point = $2
-      AND destination = $3
-    ORDER BY client_rate_id DESC
+      AND ${CLIENT_ROUTE_MATCH_SQL}
+    ORDER BY ${CLIENT_ROUTE_ORDER_SQL}
     LIMIT 1
   `;
 
@@ -2476,9 +2499,8 @@ export const updateFCInstructionAndContainers = async (
             SELECT hazardous
             FROM public.m5_client_rate
             WHERE clientid = $1
-              AND starting_point = $2
-              AND destination = $3
-            ORDER BY client_rate_id DESC
+              AND ${CLIENT_ROUTE_MATCH_SQL}
+            ORDER BY ${CLIENT_ROUTE_ORDER_SQL}
             LIMIT 1
           `;
 
@@ -2547,9 +2569,8 @@ export const updateFCInstructionAndContainers = async (
             SELECT vgm
             FROM public.m5_client_rate
             WHERE clientid = $1
-              AND starting_point = $2
-              AND destination = $3
-            ORDER BY client_rate_id DESC
+              AND ${CLIENT_ROUTE_MATCH_SQL}
+            ORDER BY ${CLIENT_ROUTE_ORDER_SQL}
             LIMIT 1
           `;
           const vgmResult = await client.query(vgmQuery, [
@@ -2610,9 +2631,8 @@ export const updateFCInstructionAndContainers = async (
             SELECT surcharges, surcharge12m
             FROM public.m5_client_rate
             WHERE clientid = $1
-              AND starting_point = $2
-              AND destination = $3
-            ORDER BY client_rate_id DESC
+              AND ${CLIENT_ROUTE_MATCH_SQL}
+            ORDER BY ${CLIENT_ROUTE_ORDER_SQL}
             LIMIT 1
           `;
           const surchargeResult = await client.query(surchargeQuery, [
@@ -2715,9 +2735,8 @@ export const updateFCInstructionAndContainers = async (
               SELECT hazardous
               FROM public.m5_client_rate
               WHERE clientid = $1
-                AND starting_point = $2
-                AND destination = $3
-              ORDER BY client_rate_id DESC
+                AND ${CLIENT_ROUTE_MATCH_SQL}
+              ORDER BY ${CLIENT_ROUTE_ORDER_SQL}
               LIMIT 1
             `;
             
@@ -2757,9 +2776,8 @@ export const updateFCInstructionAndContainers = async (
             SELECT surcharges, surcharge12m
             FROM public.m5_client_rate
             WHERE clientid = $1
-              AND starting_point = $2
-              AND destination = $3
-            ORDER BY client_rate_id DESC
+              AND ${CLIENT_ROUTE_MATCH_SQL}
+            ORDER BY ${CLIENT_ROUTE_ORDER_SQL}
             LIMIT 1
           `;
           const surchargeResult = await client.query(surchargeQuery, [
@@ -3082,9 +3100,8 @@ export const saveInstructionAndContainers = async (
             SELECT surcharges, surcharge12m
             FROM public.m5_client_rate
             WHERE clientid = $1
-              AND starting_point = $2
-              AND destination = $3
-            ORDER BY client_rate_id DESC
+              AND ${CLIENT_ROUTE_MATCH_SQL}
+            ORDER BY ${CLIENT_ROUTE_ORDER_SQL}
             LIMIT 1
           `;
           console.log(`DEBUG: Executing surcharge query with exact params: clientId='${clientId}', pickup='${pickup}', dropoff='${dropoff}'`);
@@ -3138,9 +3155,8 @@ export const saveInstructionAndContainers = async (
             SELECT hazardous
             FROM public.m5_client_rate
             WHERE clientid = $1
-              AND starting_point = $2
-              AND destination = $3
-            ORDER BY client_rate_id DESC
+              AND ${CLIENT_ROUTE_MATCH_SQL}
+            ORDER BY ${CLIENT_ROUTE_ORDER_SQL}
             LIMIT 1
           `;
           console.log(`DEBUG: Executing hazardous query with exact params: clientId='${clientId}', pickup='${pickup}', dropoff='${dropoff}'`);
@@ -3194,9 +3210,8 @@ export const saveInstructionAndContainers = async (
             SELECT vgm
             FROM public.m5_client_rate
             WHERE clientid = $1
-              AND starting_point = $2
-              AND destination = $3
-            ORDER BY client_rate_id DESC
+              AND ${CLIENT_ROUTE_MATCH_SQL}
+            ORDER BY ${CLIENT_ROUTE_ORDER_SQL}
             LIMIT 1
           `;
           console.log(`DEBUG: Executing VGM query with exact params: clientId='${clientId}', pickup='${pickup}', dropoff='${dropoff}'`);
@@ -3396,8 +3411,8 @@ export const getClientSetRate = async (clientId, starting_point, destination) =>
   const sql = `
     SELECT set_rate, fuel_surcharge
     FROM public.m5_client_rate
-    WHERE clientid = $1 AND starting_point = $2 AND destination = $3
-    ORDER BY client_rate_id DESC
+    WHERE clientid = $1 AND ${CLIENT_ROUTE_MATCH_SQL}
+    ORDER BY ${CLIENT_ROUTE_ORDER_SQL}
     LIMIT 1
   `;
 

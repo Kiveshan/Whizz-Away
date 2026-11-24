@@ -45,6 +45,29 @@
   color: #856404;
 }
 
+.custom-alert.info {
+  background-color: #e7f1fb;
+  border-color: #c6dcf3;
+  color: #1d4f7c;
+}
+
+.custom-alert.success,
+.custom-alert.error,
+.custom-alert.warning,
+.custom-alert.info {
+  border-width: 1px;
+  border-style: solid;
+}
+
+/* The base close button is white (for the old red box); match the text colour
+   on the lighter variants so the × stays visible. */
+.custom-alert.success .alert-close-btn,
+.custom-alert.error .alert-close-btn,
+.custom-alert.warning .alert-close-btn,
+.custom-alert.info .alert-close-btn {
+  color: inherit;
+}
+
 /* Form improvements */
 .form-row {
   display: grid;
