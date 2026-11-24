@@ -1,4 +1,5 @@
 import { pool } from "../../config/database.js"
+import { normalizeName } from "./driverRatesModel.js"
 
 const getAllClientsForRates = async (options = {}) => {
   let client
@@ -116,7 +117,35 @@ const getClientRatesByClientId = async (clientId) => {
   }
 }
 
-const saveClientRates = async (clientId, rates) => {
+const saveClientRates = async (clientId, rawRates) => {
+  // Store route names in canonical form (trimmed, single spaces) so the same
+  // route can't exist twice under names that only differ in spacing. This
+  // matches norm_route() used by the instruction rate lookups.
+  const rates = rawRates.map((rate) => ({
+    ...rate,
+    starting_point: normalizeName(rate.starting_point),
+    destination: normalizeName(rate.destination),
+  }))
+
+  // Reject the whole save, before anything is deleted, if a name is blank once
+  // spaces are removed, or if two lines are the same route. Otherwise lookups
+  // pick one duplicate and the other's VGM, hazardous or surcharge values are
+  // silently ignored.
+  const seen = new Set()
+  for (const rate of rates) {
+    if (!rate.starting_point || !rate.destination) {
+      return { success: false, message: "Starting point and destination are required for each rate" }
+    }
+    const key = `${rate.starting_point.toLowerCase()}\u0000${rate.destination.toLowerCase()}`
+    if (seen.has(key)) {
+      return {
+        success: false,
+        message: `Duplicate route: "${rate.starting_point} → ${rate.destination}" appears more than once. Keep one line for this route and edit it instead.`,
+      }
+    }
+    seen.add(key)
+  }
+
   let client
   try {
     client = await pool.connect()

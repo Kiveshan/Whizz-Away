@@ -238,7 +238,7 @@ export function useApi(state, actions) {
       try {
         // Validate required fields
         if (!employeeData.name || !employeeData.surname) {
-          actions.showAlert("Name and surname are required.")
+          actions.showAlert("Name and surname are required.", "error")
           actions.setLoading(false)
           return false
         }
@@ -281,11 +281,11 @@ export function useApi(state, actions) {
         actions.resetFormData("Employee")
         actions.setEditing("Employee", null)
         actions.hideForm("showEmployeeForm")
-        actions.showAlert(state.editingEmployeeId ? "Employee updated!" : "Employee added!")
+        actions.showAlert(state.editingEmployeeId ? "Employee updated!" : "Employee added!", "success")
         return true
       } catch (err) {
         console.error("Error saving employee:", err)
-        actions.showAlert(`Error: ${err.response?.data?.error || err.message}`)
+        actions.showAlert(`Error: ${err.response?.data?.error || err.message}`, "error")
         return false
       } finally {
         actions.setLoading(false)
@@ -357,11 +357,11 @@ export function useApi(state, actions) {
         actions.resetFormData("Client")
         actions.setEditing("Client", null)
         actions.hideForm("showClientForm")
-        actions.showAlert(state.isEditing ? "Client updated!" : "Client added!")
+        actions.showAlert(state.isEditing ? "Client updated!" : "Client added!", "success")
         return true
       } catch (err) {
         console.error("Error saving client:", err)
-        actions.showAlert(`Error saving client: ${err.response?.data?.error || err.message}`)
+        actions.showAlert(`Error saving client: ${err.response?.data?.error || err.message}`, "error")
         return false
       } finally {
         actions.setLoading(false)
@@ -409,11 +409,11 @@ export function useApi(state, actions) {
         actions.resetFormData("Truck")
         actions.setEditing("Truck", null)
         actions.hideForm("showTruckForm")
-        actions.showAlert(state.editTruckId ? "Truck updated!" : "Truck added!")
+        actions.showAlert(state.editTruckId ? "Truck updated!" : "Truck added!", "success")
         return true
       } catch (err) {
         console.error("Error saving truck:", err)
-        actions.showAlert(`Error: ${err.response?.data?.error || err.message}`)
+        actions.showAlert(`Error: ${err.response?.data?.error || err.message}`, "error")
         return false
       } finally {
         actions.setLoading(false)
@@ -461,11 +461,11 @@ export function useApi(state, actions) {
         actions.resetFormData("Trailer")
         actions.setEditing("Trailer", null)
         actions.hideForm("showTrailerForm")
-        actions.showAlert(state.editTrailerId ? "Trailer updated!" : "Trailer added!")
+        actions.showAlert(state.editTrailerId ? "Trailer updated!" : "Trailer added!", "success")
         return true
       } catch (err) {
         console.error("Error saving trailer:", err)
-        actions.showAlert(`Error: ${err.response?.data?.error || err.message}`)
+        actions.showAlert(`Error: ${err.response?.data?.error || err.message}`, "error")
         return false
       } finally {
         actions.setLoading(false)
@@ -623,11 +623,11 @@ export function useApi(state, actions) {
         actions.resetFormData("DriverRate")
         actions.setEditing("Rate", null)
         actions.hideForm("showDriverRateForm")
-        actions.showAlert("Driver rate saved!")
+        actions.showAlert("Driver rate saved!", "success")
         return true
       } catch (err) {
         console.error("Error saving driver rate:", err)
-        actions.showAlert(`Error saving driver rate: ${err.response?.data?.error || err.message}`)
+        actions.showAlert(`Error saving driver rate: ${err.response?.data?.error || err.message}`, "error")
         return false
       } finally {
         actions.setLoading(false)
@@ -718,7 +718,7 @@ export function useApi(state, actions) {
         actions.showPeriods(startingpoint, destination, periodsWithWarnings, legDates)
       } catch (err) {
         console.error("Error loading route for edit:", err)
-        actions.showAlert("Failed to load rate periods for this route")
+        actions.showAlert("Failed to load rate periods for this route", "error")
       } finally {
         actions.setLoading(false)
       }
@@ -733,11 +733,11 @@ export function useApi(state, actions) {
         // Client-side validation
         for (const period of periods) {
           if (!period.effective_from) {
-            actions.showAlert("Each period must have an Effective From date.")
+            actions.showAlert("Each period must have an Effective From date.", "error")
             return false
           }
           if (period.effective_to && period.effective_to < period.effective_from) {
-            actions.showAlert("Effective To cannot be before Effective From.")
+            actions.showAlert("Effective To cannot be before Effective From.", "error")
             return false
           }
           const hasRate =
@@ -746,7 +746,7 @@ export function useApi(state, actions) {
             (period.subie_six_meter_rate !== "" && period.subie_six_meter_rate != null) ||
             (period.subie_twelve_meter_rate !== "" && period.subie_twelve_meter_rate != null)
           if (!hasRate) {
-            actions.showAlert("Each period must have at least one rate value.")
+            actions.showAlert("Each period must have at least one rate value.", "error")
             return false
           }
         }
@@ -890,11 +890,11 @@ export function useApi(state, actions) {
         )
 
         actions.hidePeriods()
-        actions.showAlert("Driver rates saved!")
+        actions.showAlert("Driver rates saved!", "success")
         return true
       } catch (err) {
         console.error("Error saving route periods:", err)
-        actions.showAlert(`Error saving rates: ${err.response?.data?.error || err.message}`)
+        actions.showAlert(`Error saving rates: ${err.response?.data?.error || err.message}`, "error")
         return false
       } finally {
         actions.setLoading(false)
@@ -938,10 +938,10 @@ export function useApi(state, actions) {
           state.pagination.driverRates.itemsPerPage,
           state.filters.driverRates,
         )
-        actions.showAlert("Route deleted successfully")
+        actions.showAlert("Route deleted successfully", "success")
       } catch (err) {
         console.error("Error deleting route:", err)
-        actions.showAlert("Failed to delete route")
+        actions.showAlert("Failed to delete route", "error")
       } finally {
         actions.setLoading(false)
       }
@@ -970,14 +970,14 @@ export function useApi(state, actions) {
           !subcontractorData.email ||
           !subcontractorData.subei_reg_num
         ) {
-          actions.showAlert("Please fill in all required company information fields.")
+          actions.showAlert("Please fill in all required company information fields.", "error")
           return false
         }
 
         // Validate drivers array - at least one driver is required
         const validDrivers = (subcontractorData.drivers || []).filter((driver) => driver.name && driver.name.trim())
         if (validDrivers.length === 0) {
-          actions.showAlert("Please provide at least one driver name.")
+          actions.showAlert("Please provide at least one driver name.", "error")
           return false
         }
 
@@ -1017,12 +1017,12 @@ export function useApi(state, actions) {
         actions.resetFormData("Subcontractor")
         actions.setEditing("Subcontractor", null)
         actions.hideForm("showSubcontractorForm")
-        actions.showAlert(state.subcontractorId ? "Subcontractor updated!" : "Subcontractor added!")
+        actions.showAlert(state.subcontractorId ? "Subcontractor updated!" : "Subcontractor added!", "success")
         return true
       } catch (err) {
         console.error("Error saving subcontractor:", err)
         console.error("Error response:", err.response?.data)
-        actions.showAlert(`Error: ${err.response?.data?.error || err.message}`)
+        actions.showAlert(`Error: ${err.response?.data?.error || err.message}`, "error")
         return false
       } finally {
         actions.setLoading(false)
@@ -1038,13 +1038,13 @@ export function useApi(state, actions) {
 
         // Validate that we have a client ID
         if (!clientId) {
-          actions.showAlert("Client ID is missing.")
+          actions.showAlert("Client ID is missing.", "error")
           return false
         }
 
         // Validate that we have at least one rate
         if (!ratesData || ratesData.length === 0) {
-          actions.showAlert("Please add at least one rate.")
+          actions.showAlert("Please add at least one rate.", "error")
           return false
         }
 
@@ -1069,7 +1069,7 @@ export function useApi(state, actions) {
 
         if (validRates.length === 0) {
           actions.showAlert(
-            "Please provide valid starting point, destination, and at least one rate (6m or 12m) for each entry.",
+            "Please provide valid starting point, destination, and at least one rate (6m or 12m) for each entry.", "error"
           )
           return false
         }
@@ -1096,11 +1096,11 @@ export function useApi(state, actions) {
         actions.resetFormData("ClientRate")
         actions.setEditing("ClientRate", null)
         actions.hideForm("showClientRateForm")
-        actions.showAlert("Client rates saved successfully!")
+        actions.showAlert("Client rates saved successfully!", "success")
         return true
       } catch (err) {
         console.error("Error saving client rates:", err)
-        actions.showAlert(`Error saving client rates: ${err.response?.data?.error || err.message}`)
+        actions.showAlert(`Error saving client rates: ${err.response?.data?.error || err.message}`, "error")
         return false
       } finally {
         actions.setLoading(false)
@@ -1151,12 +1151,12 @@ export function useApi(state, actions) {
         actions.resetFormData("Supplier")
         actions.setEditing("Supplier", null)
         actions.hideForm("showSupplierForm")
-        actions.showAlert(state.editingSupplierId ? "Supplier updated!" : "Supplier added!")
+        actions.showAlert(state.editingSupplierId ? "Supplier updated!" : "Supplier added!", "success")
         return true
       } catch (err) {
         console.error("Error saving supplier:", err)
         console.error("Error response:", err.response?.data)
-        actions.showAlert(`Error saving supplier: ${err.response?.data?.error || err.message}`)
+        actions.showAlert(`Error saving supplier: ${err.response?.data?.error || err.message}`, "error")
         return false
       } finally {
         actions.setLoading(false)
@@ -1200,12 +1200,12 @@ export function useApi(state, actions) {
         actions.resetFormData("ExpenseType")
         actions.setEditing("ExpenseType", null)
         actions.hideForm("showExpenseTypeForm")
-        actions.showAlert(state.editingExpenseTypeId ? "Expense type updated!" : "Expense type added!")
+        actions.showAlert(state.editingExpenseTypeId ? "Expense type updated!" : "Expense type added!", "success")
         return true
       } catch (err) {
         console.error("Error saving expense type:", err)
         console.error("Error response:", err.response?.data)
-        actions.showAlert(`Error saving expense type: ${err.response?.data?.error || err.message}`)
+        actions.showAlert(`Error saving expense type: ${err.response?.data?.error || err.message}`, "error")
         return false
       } finally {
         actions.setLoading(false)
@@ -1219,7 +1219,7 @@ export function useApi(state, actions) {
       actions.setLoading(true)
       try {
         if (!companyData.companyname || !companyData.company_reg_num) {
-          actions.showAlert("Company name and registration number are required.")
+          actions.showAlert("Company name and registration number are required.", "error")
           return false
         }
 
@@ -1253,11 +1253,11 @@ export function useApi(state, actions) {
         actions.resetFormData("Company")
         actions.setEditing("Company", null)
         actions.hideForm("showCompanyForm")
-        actions.showAlert("Company details updated!")
+        actions.showAlert("Company details updated!", "success")
         return true
       } catch (err) {
         console.error("Error saving company:", err)
-        actions.showAlert(`Error saving company: ${err.response?.data?.error || err.message}`)
+        actions.showAlert(`Error saving company: ${err.response?.data?.error || err.message}`, "error")
         return false
       } finally {
         actions.setLoading(false)
@@ -1281,11 +1281,11 @@ export function useApi(state, actions) {
           state.filters.employees,
         )
 
-        actions.showAlert(`Employee ${newStatus ? "enabled" : "disabled"}!`)
+        actions.showAlert(`Employee ${newStatus ? "enabled" : "disabled"}!`, "success")
       } catch (err) {
         console.error(`Error toggling employee ${id}:`, err)
         actions.showAlert(
-          `Error ${currentStatus ? "disabling" : "enabling"} employee: ${err.response?.data?.error || err.message}`,
+          `Error ${currentStatus ? "disabling" : "enabling"} employee: ${err.response?.data?.error || err.message}`, "error"
         )
       } finally {
         actions.setLoading(false)
@@ -1309,11 +1309,11 @@ export function useApi(state, actions) {
           state.filters.clients,
         )
 
-        actions.showAlert(`Client ${newStatus ? "enabled" : "disabled"}!`)
+        actions.showAlert(`Client ${newStatus ? "enabled" : "disabled"}!`, "success")
       } catch (err) {
         console.error(`Error toggling client ${id}:`, err)
         actions.showAlert(
-          `Error ${currentStatus ? "disabling" : "enabling"} client: ${err.response?.data?.error || err.message}`,
+          `Error ${currentStatus ? "disabling" : "enabling"} client: ${err.response?.data?.error || err.message}`, "error"
         )
       } finally {
         actions.setLoading(false)
@@ -1337,11 +1337,11 @@ export function useApi(state, actions) {
           state.filters.subcontractors,
         )
 
-        actions.showAlert(`Subcontractor ${newStatus ? "enabled" : "disabled"}!`)
+        actions.showAlert(`Subcontractor ${newStatus ? "enabled" : "disabled"}!`, "success")
       } catch (err) {
         console.error(`Error toggling subcontractor ${id}:`, err)
         actions.showAlert(
-          `Error ${currentStatus ? "disabling" : "enabling"} subcontractor: ${err.response?.data?.error || err.message}`,
+          `Error ${currentStatus ? "disabling" : "enabling"} subcontractor: ${err.response?.data?.error || err.message}`, "error"
         )
       } finally {
         actions.setLoading(false)
@@ -1365,12 +1365,12 @@ export function useApi(state, actions) {
           state.filters.subcontractors,
         )
 
-        actions.showAlert(`Driver ${newStatus ? "enabled" : "disabled"}!`)
+        actions.showAlert(`Driver ${newStatus ? "enabled" : "disabled"}!`, "success")
         return true
       } catch (err) {
         console.error(`Error toggling driver ${driverId}:`, err)
         actions.showAlert(
-          `Error ${currentStatus ? "disabling" : "enabling"} driver: ${err.response?.data?.error || err.message}`,
+          `Error ${currentStatus ? "disabling" : "enabling"} driver: ${err.response?.data?.error || err.message}`, "error"
         )
         return false
       } finally {
@@ -1401,7 +1401,7 @@ export function useApi(state, actions) {
           state.filters.suppliers,
         )
 
-        actions.showAlert(`Supplier status toggled successfully!`)
+        actions.showAlert(`Supplier status toggled successfully!`, "success")
       } catch (err) {
         console.error(`Error toggling supplier ${id}:`, {
           message: err.message,
@@ -1409,7 +1409,7 @@ export function useApi(state, actions) {
           status: err.response?.status,
           code: err.code,
         })
-        actions.showAlert(`Error toggling supplier status: ${err.response?.data?.error || err.message}`)
+        actions.showAlert(`Error toggling supplier status: ${err.response?.data?.error || err.message}`, "error")
       } finally {
         actions.setLoading(false)
       }
@@ -1435,11 +1435,11 @@ export function useApi(state, actions) {
           state.filters.trucks,
         )
 
-        actions.showAlert(`Truck ${newStatus ? "enabled" : "disabled"}!`)
+        actions.showAlert(`Truck ${newStatus ? "enabled" : "disabled"}!`, "success")
       } catch (err) {
         console.error(`Error toggling truck ${id}:`, err)
         actions.showAlert(
-          `Error ${currentStatus ? "disabling" : "enabling"} truck: ${err.response?.data?.error || err.message}`,
+          `Error ${currentStatus ? "disabling" : "enabling"} truck: ${err.response?.data?.error || err.message}`, "error"
         )
       } finally {
         actions.setLoading(false)
@@ -1463,11 +1463,11 @@ export function useApi(state, actions) {
           state.filters.trailers,
         )
 
-        actions.showAlert(`Trailer ${newStatus ? "enabled" : "disabled"}!`)
+        actions.showAlert(`Trailer ${newStatus ? "enabled" : "disabled"}!`, "success")
       } catch (err) {
         console.error(`Error toggling trailer ${id}:`, err)
         actions.showAlert(
-          `Error ${currentStatus ? "disabling" : "enabling"} trailer: ${err.response?.data?.error || err.message}`,
+          `Error ${currentStatus ? "disabling" : "enabling"} trailer: ${err.response?.data?.error || err.message}`, "error"
         )
       } finally {
         actions.setLoading(false)
@@ -1520,10 +1520,10 @@ export function useApi(state, actions) {
           await fetchAllExpenseTypes()
         }
 
-        actions.showAlert(`${type.charAt(0).toUpperCase() + type.slice(1)} deleted!`)
+        actions.showAlert(`${type.charAt(0).toUpperCase() + type.slice(1)} deleted!`, "success")
       } catch (err) {
         console.error(`Error deleting ${type} ${id}:`, err)
-        actions.showAlert(`Error deleting ${type}: ${err.response?.data?.error || err.message}`)
+        actions.showAlert(`Error deleting ${type}: ${err.response?.data?.error || err.message}`, "error")
       } finally {
         actions.setLoading(false)
       }
@@ -1656,7 +1656,7 @@ export function useApi(state, actions) {
           const numericId = Number.parseInt(id)
           if (isNaN(numericId) || numericId <= 0) {
             console.error(`Invalid ID for ${type}:`, id)
-            actions.showAlert(`Invalid ${type} ID provided.`)
+            actions.showAlert(`Invalid ${type} ID provided.`, "error")
             return
           }
 
@@ -1869,7 +1869,7 @@ export function useApi(state, actions) {
         actions.showForm(`show${formType}Form`)
       } catch (error) {
         console.error(`Error loading ${type} for edit:`, error)
-        actions.showAlert(`Could not load ${type} details: ${error.response?.data?.error || error.message}`)
+        actions.showAlert(`Could not load ${type} details: ${error.response?.data?.error || error.message}`, "error")
       }
     },
     [actions],

@@ -742,9 +742,16 @@ tr:hover {
   margin-bottom: 12px;
 }
 
+/* 3 per row (was 5) so route names in the inputs have room to be read. */
+@media (min-width: 700px) {
+  .rate-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (min-width: 1024px) {
   .rate-row {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -986,7 +993,10 @@ tr:hover {
   padding: 15px;
   border-radius: 5px;
   box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
-  display: none;
+  /* CustomAlert is only rendered while there is a message, so it must be
+     visible when present. This was `display: none`, which hid every Manage
+     page alert (saves, errors, validation) from the user. */
+  display: flex;
   align-items: center;
   justify-content: space-between;
   z-index: 9999;

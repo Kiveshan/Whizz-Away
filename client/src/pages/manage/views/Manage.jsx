@@ -346,7 +346,9 @@ const Manage = () => {
       </div>
 
       {/* Alert */}
-      {state.showAlert && <CustomAlert message={state.alertMessage} onClose={actions.hideAlert} />}
+      {state.showAlert && (
+        <CustomAlert message={state.alertMessage} type={state.alertType} onClose={actions.hideAlert} />
+      )}
 
       {/* Tab Navigation */}
       <div className="manage-button-row">

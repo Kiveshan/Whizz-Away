@@ -301,6 +301,7 @@ const initialState = {
   // Alert
   showAlert: false,
   alertMessage: "",
+  alertType: "info",
 }
 
 // Reducer
@@ -407,10 +408,15 @@ function manageReducer(state, action) {
       }
 
     case "SHOW_ALERT":
-      return { ...state, showAlert: true, alertMessage: action.payload }
+      return {
+        ...state,
+        showAlert: true,
+        alertMessage: action.payload.message,
+        alertType: action.payload.alertType,
+      }
 
     case "HIDE_ALERT":
-      return { ...state, showAlert: false, alertMessage: "" }
+      return { ...state, showAlert: false, alertMessage: "", alertType: "info" }
 
     // Driver rate periods (card-based edit view)
     case "SHOW_DRIVER_RATE_PERIODS":
@@ -523,8 +529,9 @@ export function useManageState() {
       dispatch({ type: "RESET_FORM_DATA", payload: type })
     }, []),
 
-    showAlert: useCallback((message) => {
-      dispatch({ type: "SHOW_ALERT", payload: message })
+    // type: "success" | "error" | "warning" | "info" — picks the alert colour.
+    showAlert: useCallback((message, type = "info") => {
+      dispatch({ type: "SHOW_ALERT", payload: { message, alertType: type } })
     }, []),
 
     hideAlert: useCallback(() => {
